@@ -140,3 +140,14 @@ For demo flags, `true`, `1`, or `yes` (any common casing) all count as enabled.
 **Sign out (Android):** every tab header has **Sign out** (same as web sidebar). In **`__DEV__`**, the React Native dev menu also lists **FreelanceOS: Sign out** (`DevSettings.addMenuItem`). The dashboard shows **expo-constants** (slug, version) and resolved API URL in dev only.
 
 
+
+
+
+
+
+
+# Backend Temporary ReadMe :) (will replace very soon)
+
+    cd backend
+    pip install -r requirements.txt
+    uvicorn main:app --reload --port 8000
