@@ -106,16 +106,7 @@ Use your machine’s LAN IP instead of `10.0.2.2` when testing on a physical dev
 
 For demo flags, `true`, `1`, or `yes` (any common casing) all count as enabled.
 
-## Troubleshooting
-
-| Issue | What to do |
-|--------|------------|
-| **Chat send does nothing** | Without the API, set **`VITE_DEMO_MODE=true`** (web) or **`EXPO_PUBLIC_DEMO_MODE=true`** (Android), then **restart** the dev server / Expo. Demo chat does not use WebSockets. |
-| **Still stuck after editing `.env`** | Vite and Expo read env at **startup** — always stop and restart `npm run dev` or `expo start`. Hard-refresh the browser. |
-| **“Reconnecting” / offline in chat** | Backend WebSocket URL wrong or server down — or switch to **demo mode** for local-only chat. |
-| **Sign up / login fails** | Demo mode accepts any credentials. Live mode needs **`POST /auth/register`** and **`POST /auth/login`** on the FastAPI app. |
-
-## Backend integration (Vincent-Daniel)
+## Backend integration 
 
 | What | Endpoint / URL | Used in |
 |------|----------------|---------|
@@ -148,11 +139,4 @@ For demo flags, `true`, `1`, or `yes` (any common casing) all count as enabled.
 
 **Sign out (Android):** every tab header has **Sign out** (same as web sidebar). In **`__DEV__`**, the React Native dev menu also lists **FreelanceOS: Sign out** (`DevSettings.addMenuItem`). The dashboard shows **expo-constants** (slug, version) and resolved API URL in dev only.
 
-## Recent fixes (Angela pass)
 
-- **Scaffolded** `web/` and `android/` so imports match this README (no more broken flat files).
-- **Web:** responsive layout (sidebar drawer + overlay on small screens), `AuthProvider` + JWT axios helper, stub pages wired to the API.
-- **Android:** **login when logged out** (was incorrectly routing to Profile onboarding). Removed fake chat tab badge.
-- **ScopeAlert:** **Dismiss** button calls `onDismiss`; **ChatWindow:** safe initials when `client_name` is missing; stable `id` on scope payloads.
-- **Android:** native **ScopeAlert** + **`scope_alert`** handling in chat; **AuthContext** + header **Sign out**; **`__DEV__`** dev-menu sign-out and **expo-constants** debug card on dashboard (**expo-clipboard** for copy).
-- **Chat:** demo sends no longer depend on WebSocket `connected` (race fix); **`projectId` cleared** resets thread state; Android send button matches web (hint when offline); **`String(id)`** thread selection when API returns numeric ids.
