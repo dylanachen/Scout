@@ -31,3 +31,15 @@ Please download backend and place them to web/ (like web/backend)
     OPENAI_API_KEY=sk-...           # enables real LLM for onboarding + scope guardian
     DB_PATH=freelanceos.db
     UPLOAD_DIR=uploads
+
+
+### Web app step
+First, run backend
+
+    cd web/backend
+    uvicorn main:app --reload --port 8000
+
+Then, run fronend
+
+    cd ..
+    npm run dev 
