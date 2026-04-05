@@ -147,6 +147,8 @@ For demo flags, `true`, `1`, or `yes` (any common casing) all count as enabled.
 
 
 # Backend Temporary ReadMe :) (will replace very soon)
+FastAPI + SQLite + WebSocket + RAG (ChromaDB + pdfplumber)
+
 
     cd backend
     pip install -r requirements.txt
