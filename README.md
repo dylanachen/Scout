@@ -10,13 +10,12 @@ cp .env.example .env          # set VITE_API_URL and VITE_WS_URL
 npm run dev                   # http://localhost:3000
 ```
 
-### `web/.env`
+### web/.env setting
 ```
 VITE_API_URL=http://localhost:8000
 VITE_WS_URL=ws://localhost:8000
-VITE_DEMO_MODE=true
+VITE_DEMO_MODE=false
 ```
-
 
 # Backend Part
 FastAPI + SQLite + WebSocket + RAG (ChromaDB + pdfplumber)
