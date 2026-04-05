@@ -151,3 +151,9 @@ For demo flags, `true`, `1`, or `yes` (any common casing) all count as enabled.
     cd backend
     pip install -r requirements.txt
     uvicorn main:app --reload --port 8000
+
+### .env  (or export in shell)
+SECRET_KEY=your-secret-key-here
+OPENAI_API_KEY=sk-...           # enables real LLM for onboarding + scope guardian
+DB_PATH=freelanceos.db
+UPLOAD_DIR=uploads
