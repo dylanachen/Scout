@@ -138,24 +138,3 @@ For demo flags, `true`, `1`, or `yes` (any common casing) all count as enabled.
 `useWebSocket` forwards `payload` into `ScopeAlert` on web; **`ChatScreen`** does the same on Android (`components/ScopeAlert.tsx`, **expo-clipboard** for “Copy suggested reply”).
 
 **Sign out (Android):** every tab header has **Sign out** (same as web sidebar). In **`__DEV__`**, the React Native dev menu also lists **FreelanceOS: Sign out** (`DevSettings.addMenuItem`). The dashboard shows **expo-constants** (slug, version) and resolved API URL in dev only.
-
-
-
-
-
-
-
-
-# Backend Temporary ReadMe :) (will replace very soon)
-FastAPI + SQLite + WebSocket + RAG (ChromaDB + pdfplumber)
-
-
-    cd backend
-    pip install -r requirements.txt
-    uvicorn main:app --reload --port 8000
-
-### .env  (or export in shell)
-SECRET_KEY=your-secret-key-here
-OPENAI_API_KEY=sk-...           # enables real LLM for onboarding + scope guardian
-DB_PATH=freelanceos.db
-UPLOAD_DIR=uploads
