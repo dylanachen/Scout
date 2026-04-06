@@ -24,9 +24,20 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # ── Lifespan ────────────────────────────────────────────────────────────────
 
+def init_chroma():
+    """Create the shared profiles ChromaDB collection if it doesn't exist."""
+    import chromadb
+    from chromadb.utils import embedding_functions
+    client = chromadb.PersistentClient(path="./chroma_db")
+    ef = embedding_functions.DefaultEmbeddingFunction()
+    client.get_or_create_collection("profiles", embedding_function=ef)
+    print("[ChromaDB] profiles collection ready")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    init_chroma()
     yield
 
 app = FastAPI(title="FreelanceOS API", lifespan=lifespan)
@@ -51,6 +62,29 @@ class OnboardingMessage(BaseModel):
 class InvoicePatch(BaseModel):
     status: Optional[str] = None
     amount: Optional[str] = None
+
+class FreelancerProfileIn(BaseModel):
+    skills: Optional[list[str]] = None
+    hourly_rate: Optional[float] = None
+    availability: Optional[str] = None   # "full-time" | "part-time" | "project-based"
+    experience_years: Optional[int] = None
+    bio: Optional[str] = None
+    portfolio_url: Optional[str] = None
+    location: Optional[str] = None
+
+class ClientProfileIn(BaseModel):
+    company_name: Optional[str] = None
+    industry: Optional[str] = None
+    project_description: Optional[str] = None
+    required_skills: Optional[list[str]] = None
+    budget_min: Optional[float] = None
+    budget_max: Optional[float] = None
+    timeline: Optional[str] = None       # "1-2 weeks" | "1 month" | "3+ months"
+    team_size: Optional[int] = None
+    location: Optional[str] = None
+
+class MatchPatch(BaseModel):
+    status: str  # "accepted" | "rejected"
 
 # ── WebSocket connection manager ─────────────────────────────────────────────
 
@@ -314,6 +348,96 @@ async def onboarding_message(
     conn.close()
     return {"reply": reply}
 
+@app.post("/onboarding/extract-profile")
+async def extract_profile_from_onboarding(user_id: int = Depends(get_current_user_id)):
+    """
+    Read the current user's onboarding conversation, use GPT to extract structured
+    profile fields, then upsert the profile (SQLite + ChromaDB embedding).
+    """
+    user = get_user_by_id(user_id)
+    role = user["role"]
+
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT message, reply FROM onboarding_sessions WHERE user_id = ? ORDER BY created_at ASC",
+        (user_id,),
+    ).fetchall()
+    conn.close()
+
+    if not rows:
+        raise HTTPException(status_code=400, detail="No onboarding conversation found")
+
+    # Build conversation transcript
+    transcript_parts = []
+    for r in rows:
+        transcript_parts.append(f"User: {r['message']}")
+        transcript_parts.append(f"Assistant: {r['reply']}")
+    transcript = "\n".join(transcript_parts)
+
+    openai_key = os.environ.get("OPENAI_API_KEY")
+    if not openai_key:
+        raise HTTPException(status_code=503, detail="OPENAI_API_KEY not set")
+
+    if role == "freelancer":
+        schema_hint = """{
+  "skills": ["list", "of", "skills"],
+  "hourly_rate": 0.0,
+  "availability": "full-time|part-time|project-based",
+  "experience_years": 0,
+  "bio": "short bio",
+  "portfolio_url": "url or null",
+  "location": "city or null"
+}"""
+    else:
+        schema_hint = """{
+  "company_name": "name or null",
+  "industry": "industry or null",
+  "project_description": "description",
+  "required_skills": ["list", "of", "skills"],
+  "budget_min": 0.0,
+  "budget_max": 0.0,
+  "timeline": "1-2 weeks|1 month|3+ months or null",
+  "team_size": 0,
+  "location": "city or null"
+}"""
+
+    prompt = f"""Extract structured profile data for a {role} from the following onboarding conversation.
+Return ONLY valid JSON matching the schema below. Use null for any field not mentioned.
+
+Schema:
+{schema_hint}
+
+Conversation:
+{transcript}"""
+
+    try:
+        from openai import AsyncOpenAI
+        oai = AsyncOpenAI(api_key=openai_key)
+        resp = await oai.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=512,
+            response_format={"type": "json_object"},
+        )
+        extracted = json.loads(resp.choices[0].message.content)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"LLM extraction failed: {e}")
+
+    # Upsert via the same logic as the profile endpoints
+    if role == "freelancer":
+        profile_body = FreelancerProfileIn(**{
+            k: extracted.get(k) for k in FreelancerProfileIn.model_fields
+        })
+        upsert_freelancer_profile(profile_body, user_id)
+    else:
+        profile_body = ClientProfileIn(**{
+            k: extracted.get(k) for k in ClientProfileIn.model_fields
+        })
+        upsert_client_profile(profile_body, user_id)
+
+    return {"ok": True, "extracted": extracted}
+
+
 # ── WebSocket chat ────────────────────────────────────────────────────────────
 
 @app.websocket("/ws/chat/{project_id}")
@@ -461,3 +585,254 @@ Respond with JSON only."""
                 pass
     except Exception as e:
         print(f"[ScopeGuardian] Error: {e}")
+
+
+# ── Profiles ──────────────────────────────────────────────────────────────────
+
+@app.post("/profiles/freelancer", status_code=201)
+def upsert_freelancer_profile(
+    body: FreelancerProfileIn,
+    user_id: int = Depends(get_current_user_id),
+):
+    from matching import build_freelancer_text, upsert_profile_embedding
+
+    data = body.model_dump()
+    # Serialize list fields to JSON strings for SQLite storage
+    data["skills"] = json.dumps(data["skills"]) if data["skills"] is not None else None
+
+    conn = get_conn()
+    existing = conn.execute(
+        "SELECT id FROM freelancer_profiles WHERE user_id = ?", (user_id,)
+    ).fetchone()
+
+    if existing:
+        set_clause = ", ".join(
+            f"{k} = ?" for k in data if data[k] is not None
+        ) + ", updated_at = datetime('now')"
+        values = [v for v in data.values() if v is not None]
+        conn.execute(
+            f"UPDATE freelancer_profiles SET {set_clause} WHERE user_id = ?",
+            (*values, user_id),
+        )
+    else:
+        cols = ["user_id"] + [k for k, v in data.items() if v is not None]
+        placeholders = ", ".join("?" for _ in cols)
+        values = [user_id] + [v for v in data.values() if v is not None]
+        conn.execute(
+            f"INSERT INTO freelancer_profiles ({', '.join(cols)}) VALUES ({placeholders})",
+            values,
+        )
+
+    conn.commit()
+
+    # Rebuild and upsert embedding
+    profile = row_to_dict(
+        conn.execute(
+            "SELECT * FROM freelancer_profiles WHERE user_id = ?", (user_id,)
+        ).fetchone()
+    )
+    conn.close()
+
+    profile_text = build_freelancer_text(profile)
+    upsert_profile_embedding(user_id, "freelancer", profile_text)
+
+    return {"ok": True}
+
+
+@app.post("/profiles/client", status_code=201)
+def upsert_client_profile(
+    body: ClientProfileIn,
+    user_id: int = Depends(get_current_user_id),
+):
+    from matching import build_client_text, upsert_profile_embedding
+
+    data = body.model_dump()
+    data["required_skills"] = (
+        json.dumps(data["required_skills"]) if data["required_skills"] is not None else None
+    )
+
+    conn = get_conn()
+    existing = conn.execute(
+        "SELECT id FROM client_profiles WHERE user_id = ?", (user_id,)
+    ).fetchone()
+
+    if existing:
+        set_clause = ", ".join(
+            f"{k} = ?" for k in data if data[k] is not None
+        ) + ", updated_at = datetime('now')"
+        values = [v for v in data.values() if v is not None]
+        conn.execute(
+            f"UPDATE client_profiles SET {set_clause} WHERE user_id = ?",
+            (*values, user_id),
+        )
+    else:
+        cols = ["user_id"] + [k for k, v in data.items() if v is not None]
+        placeholders = ", ".join("?" for _ in cols)
+        values = [user_id] + [v for v in data.values() if v is not None]
+        conn.execute(
+            f"INSERT INTO client_profiles ({', '.join(cols)}) VALUES ({placeholders})",
+            values,
+        )
+
+    conn.commit()
+
+    profile = row_to_dict(
+        conn.execute(
+            "SELECT * FROM client_profiles WHERE user_id = ?", (user_id,)
+        ).fetchone()
+    )
+    conn.close()
+
+    profile_text = build_client_text(profile)
+    upsert_profile_embedding(user_id, "client", profile_text)
+
+    return {"ok": True}
+
+
+@app.get("/profiles/me")
+def get_my_profile(user_id: int = Depends(get_current_user_id)):
+    user = get_user_by_id(user_id)
+    conn = get_conn()
+
+    if user["role"] == "client":
+        row = conn.execute(
+            "SELECT * FROM client_profiles WHERE user_id = ?", (user_id,)
+        ).fetchone()
+    else:
+        row = conn.execute(
+            "SELECT * FROM freelancer_profiles WHERE user_id = ?", (user_id,)
+        ).fetchone()
+
+    conn.close()
+    if not row:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
+    profile = row_to_dict(row)
+    # Deserialize JSON skill arrays for API consumers
+    for field in ("skills", "required_skills"):
+        if field in profile and isinstance(profile[field], str):
+            try:
+                profile[field] = json.loads(profile[field])
+            except (json.JSONDecodeError, ValueError):
+                pass
+
+    return profile
+
+
+# ── Matches ───────────────────────────────────────────────────────────────────
+
+@app.post("/matches/compute")
+def compute_matches_endpoint(user_id: int = Depends(get_current_user_id)):
+    from matching import compute_matches
+
+    user = get_user_by_id(user_id)
+    role = user["role"]
+
+    conn = get_conn()
+    results = compute_matches(user_id, role, conn)
+
+    if not results:
+        conn.close()
+        return {"matches": []}
+
+    # Persist new suggestions (skip pairs that already have an entry)
+    for m in results:
+        other_id = m["other_user_id"]
+        freelancer_id = user_id if role == "freelancer" else other_id
+        client_id = other_id if role == "freelancer" else user_id
+
+        existing = conn.execute(
+            """SELECT id FROM match_history
+               WHERE freelancer_id = ? AND client_id = ? AND status = 'suggested'""",
+            (freelancer_id, client_id),
+        ).fetchone()
+
+        if not existing:
+            conn.execute(
+                "INSERT INTO match_history (freelancer_id, client_id, score) VALUES (?, ?, ?)",
+                (freelancer_id, client_id, m["score"]),
+            )
+            conn.commit()
+            match_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+            m["match_id"] = match_id
+        else:
+            m["match_id"] = existing["id"]
+
+    conn.close()
+    return {"matches": results}
+
+
+@app.get("/matches")
+def list_matches(user_id: int = Depends(get_current_user_id)):
+    user = get_user_by_id(user_id)
+    role = user["role"]
+
+    conn = get_conn()
+    if role == "freelancer":
+        rows = conn.execute(
+            """SELECT mh.id, mh.freelancer_id, mh.client_id, mh.score, mh.status, mh.created_at,
+                      u.name AS other_name, u.email AS other_email
+               FROM match_history mh
+               JOIN users u ON u.id = mh.client_id
+               WHERE mh.freelancer_id = ?
+               ORDER BY mh.score DESC""",
+            (user_id,),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            """SELECT mh.id, mh.freelancer_id, mh.client_id, mh.score, mh.status, mh.created_at,
+                      u.name AS other_name, u.email AS other_email
+               FROM match_history mh
+               JOIN users u ON u.id = mh.freelancer_id
+               WHERE mh.client_id = ?
+               ORDER BY mh.score DESC""",
+            (user_id,),
+        ).fetchall()
+    conn.close()
+    return [row_to_dict(r) for r in rows]
+
+
+@app.get("/matches/{match_id}")
+def get_match(match_id: int, user_id: int = Depends(get_current_user_id)):
+    conn = get_conn()
+    row = conn.execute(
+        """SELECT mh.*,
+                  fl.name AS freelancer_name, fl.email AS freelancer_email,
+                  cl.name AS client_name,     cl.email AS client_email
+           FROM match_history mh
+           JOIN users fl ON fl.id = mh.freelancer_id
+           JOIN users cl ON cl.id = mh.client_id
+           WHERE mh.id = ? AND (mh.freelancer_id = ? OR mh.client_id = ?)""",
+        (match_id, user_id, user_id),
+    ).fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(status_code=404, detail="Match not found")
+    return row_to_dict(row)
+
+
+@app.patch("/matches/{match_id}")
+def patch_match(
+    match_id: int,
+    body: MatchPatch,
+    user_id: int = Depends(get_current_user_id),
+):
+    if body.status not in ("accepted", "rejected"):
+        raise HTTPException(status_code=422, detail="status must be 'accepted' or 'rejected'")
+
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT id FROM match_history WHERE id = ? AND (freelancer_id = ? OR client_id = ?)",
+        (match_id, user_id, user_id),
+    ).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Match not found")
+
+    conn.execute(
+        "UPDATE match_history SET status = ? WHERE id = ?",
+        (body.status, match_id),
+    )
+    conn.commit()
+    conn.close()
+    return {"ok": True}

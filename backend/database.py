@@ -77,6 +77,45 @@ def init_db():
         reply       TEXT    NOT NULL,
         created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS freelancer_profiles (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id           INTEGER UNIQUE NOT NULL REFERENCES users(id),
+        skills            TEXT,
+        hourly_rate       REAL,
+        availability      TEXT,
+        experience_years  INTEGER,
+        bio               TEXT,
+        portfolio_url     TEXT,
+        location          TEXT,
+        created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at        TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS client_profiles (
+        id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id             INTEGER UNIQUE NOT NULL REFERENCES users(id),
+        company_name        TEXT,
+        industry            TEXT,
+        project_description TEXT,
+        required_skills     TEXT,
+        budget_min          REAL,
+        budget_max          REAL,
+        timeline            TEXT,
+        team_size           INTEGER,
+        location            TEXT,
+        created_at          TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at          TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS match_history (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        freelancer_id INTEGER NOT NULL REFERENCES users(id),
+        client_id     INTEGER NOT NULL REFERENCES users(id),
+        score         REAL,
+        status        TEXT NOT NULL DEFAULT 'suggested',
+        created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    );
     """)
 
     # Seed demo data for demo user
