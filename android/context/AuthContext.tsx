@@ -1,13 +1,23 @@
 import React, { createContext, useContext } from 'react';
+import type { MeUser } from '../api/client';
 
 type AuthContextValue = {
   signOut: () => Promise<void>;
+  user: MeUser | null;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-export function AuthProvider({ children, signOut }: { children: React.ReactNode; signOut: () => Promise<void> }) {
-  return <AuthContext.Provider value={{ signOut }}>{children}</AuthContext.Provider>;
+export function AuthProvider({
+  children,
+  signOut,
+  user,
+}: {
+  children: React.ReactNode;
+  signOut: () => Promise<void>;
+  user: MeUser | null;
+}) {
+  return <AuthContext.Provider value={{ signOut, user }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

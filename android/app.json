@@ -9,6 +9,14 @@
     "ios": { "supportsTablet": true },
     "android": {
       "adaptiveIcon": { "backgroundColor": "#0f1623" }
-    }
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow FreelanceOS to access your photos to set a profile picture."
+        }
+      ]
+    ]
   }
 }

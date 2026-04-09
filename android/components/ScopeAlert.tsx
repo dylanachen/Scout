@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
 
 export type ScopeAlertPayload = {
   id: string;
@@ -8,6 +7,8 @@ export type ScopeAlertPayload = {
   suggested_reply?: string;
   contract_clause?: string;
   after_message_id?: string;
+  severity?: 'low' | 'medium' | 'high';
+  explanation?: string;
 };
 
 type Props = {
@@ -15,33 +16,42 @@ type Props = {
   onDismiss?: (id: string) => void;
 };
 
-/** Private AI Scope Guardian card (freelancer-only in product). */
+function severityColor(sev?: string) {
+  switch (sev) {
+    case 'high':
+      return { bg: '#fef2f2', fg: '#dc2626' };
+    case 'low':
+      return { bg: '#f0fdf4', fg: '#16a34a' };
+    default:
+      return { bg: '#fffbeb', fg: '#d97706' };
+  }
+}
+
 export default function ScopeAlert({ alert, onDismiss }: Props) {
-  const { id, message, suggested_reply, contract_clause } = alert;
-
+  const { id, message, severity = 'medium', explanation, contract_clause } = alert;
+  const sev = severityColor(severity);
   const dismiss = () => onDismiss?.(id);
-
-  const copyReply = async () => {
-    if (!suggested_reply) return;
-    await Clipboard.setStringAsync(suggested_reply);
-    Alert.alert('Copied', 'Suggested reply copied to clipboard.');
-  };
 
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>!</Text>
+        <Text style={styles.lockIcon}>{'\u{1F512}'}</Text>
+        <Text style={styles.title}>Scope Flag</Text>
+        <View style={[styles.sevBadge, { backgroundColor: sev.bg }]}>
+          <Text style={[styles.sevText, { color: sev.fg }]}>
+            {severity.charAt(0).toUpperCase() + severity.slice(1)}
+          </Text>
         </View>
-        <Text style={styles.title}>AI Scope Guardian · Private</Text>
-        {onDismiss ? (
-          <TouchableOpacity onPress={dismiss} hitSlop={12} accessibilityLabel="Dismiss">
-            <Text style={styles.close}>×</Text>
+        {onDismiss && (
+          <TouchableOpacity onPress={dismiss} hitSlop={12} style={styles.closeWrap}>
+            <Text style={styles.close}>{'\u00d7'}</Text>
           </TouchableOpacity>
-        ) : null}
+        )}
       </View>
 
       <Text style={styles.body}>{message}</Text>
+
+      {explanation ? <Text style={styles.explanation}>{explanation}</Text> : null}
 
       {contract_clause ? (
         <View style={styles.refBox}>
@@ -52,22 +62,27 @@ export default function ScopeAlert({ alert, onDismiss }: Props) {
         </View>
       ) : null}
 
+      <Text style={styles.respondHeading}>How do you want to respond?</Text>
+
       <View style={styles.actions}>
-        {suggested_reply ? (
-          <ScopeBtn label="Copy suggested reply" onPress={copyReply} />
-        ) : null}
-        <ScopeBtn label="Draft change order" onPress={() => Alert.alert('Coming soon', 'Wire to change-order flow.')} />
-        <ScopeBtn label="Log decision" onPress={() => Alert.alert('Coming soon', 'Wire to decision logger.')} />
-        {onDismiss ? <ScopeBtn label="Dismiss" onPress={dismiss} /> : null}
+        <ChipBtn
+          label="Send change order"
+          onPress={() => Alert.alert('Change Order', 'Wire to change-order flow.')}
+        />
+        <ChipBtn
+          label="Discuss with client"
+          onPress={() => Alert.alert('Discuss', 'Wire to discussion flow.')}
+        />
+        <ChipBtn label="Dismiss" onPress={dismiss} />
       </View>
     </View>
   );
 }
 
-function ScopeBtn({ label, onPress }: { label: string; onPress: () => void }) {
+function ChipBtn({ label, onPress }: { label: string; onPress: () => void }) {
   return (
-    <TouchableOpacity style={styles.btn} onPress={onPress}>
-      <Text style={styles.btnText}>{label}</Text>
+    <TouchableOpacity style={styles.chip} onPress={onPress}>
+      <Text style={styles.chipText}>{label}</Text>
     </TouchableOpacity>
   );
 }
@@ -76,52 +91,67 @@ const styles = StyleSheet.create({
   card: {
     marginVertical: 6,
     padding: 12,
-    backgroundColor: '#fff7ed',
+    backgroundColor: '#fffbeb',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#fed7aa',
+    borderColor: '#fde68a',
     borderLeftWidth: 3,
-    borderLeftColor: '#c2410c',
+    borderLeftColor: '#f59e0b',
   },
-  header: { flexDirection: 'row', alignItems: 'center', marginBottom: 6, gap: 8 },
-  badge: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: '#c2410c',
+  header: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    marginBottom: 6,
+    gap: 8,
   },
-  badgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
+  lockIcon: { fontSize: 14 },
   title: {
-    flex: 1,
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    color: '#c2410c',
+    color: '#92400e',
   },
+  sevBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  sevText: { fontSize: 10, fontWeight: '600' },
+  closeWrap: { marginLeft: 'auto' },
   close: { fontSize: 18, color: '#9aa0ae', lineHeight: 20 },
-  body: { fontSize: 12, color: '#7c2d12', lineHeight: 18, marginBottom: 10 },
+  body: { fontSize: 13, color: '#78350f', lineHeight: 19, marginBottom: 6 },
+  explanation: {
+    fontSize: 12,
+    color: '#92400e',
+    lineHeight: 18,
+    marginBottom: 8,
+    fontStyle: 'italic',
+  },
   refBox: {
-    backgroundColor: 'rgba(255,255,255,0.65)',
+    backgroundColor: 'rgba(255,255,255,0.6)',
     borderWidth: 1,
-    borderColor: '#fed7aa',
+    borderColor: '#fde68a',
     borderRadius: 6,
     paddingVertical: 6,
     paddingHorizontal: 10,
-    marginBottom: 10,
+    marginBottom: 8,
   },
-  refText: { fontSize: 11, color: '#7c2d12' },
+  refText: { fontSize: 11, color: '#78350f' },
   refStrong: { fontWeight: '700' },
+  respondHeading: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#92400e',
+    marginBottom: 8,
+    marginTop: 2,
+  },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  btn: {
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 6,
+  chip: {
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#fed7aa',
+    borderColor: '#f59e0b',
     backgroundColor: '#fff',
   },
-  btnText: { fontSize: 11, fontWeight: '500', color: '#c2410c' },
+  chipText: { fontSize: 11, fontWeight: '600', color: '#b45309' },
 });
