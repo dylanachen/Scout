@@ -447,6 +447,8 @@ export default function ChatWindow({ project, meetingInviteOpen, onMeetingInvite
           gap: 8,
           background: 'var(--color-surface)',
           flexShrink: 0,
+          position: 'relative',
+          zIndex: 20,
         }}
       >
         {/* Back arrow */}

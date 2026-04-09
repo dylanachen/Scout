@@ -90,6 +90,9 @@ function Layout() {
               borderBottom: '1px solid var(--color-border)',
               background: 'var(--color-surface)',
               flexShrink: 0,
+              /* Popovers (bell, profile) extend below header; next sibling would paint over them without this */
+              position: 'relative',
+              zIndex: 30,
             }}
           >
           <div style={{ fontWeight: 700, fontSize: 15, letterSpacing: '-.2px' }}>FreelanceOS</div>

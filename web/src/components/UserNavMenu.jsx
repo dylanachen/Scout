@@ -101,7 +101,10 @@ export default function UserNavMenu({ variant = 'sidebar' }) {
             position: 'absolute',
             left: compact ? 'auto' : 0,
             right: compact ? 0 : 0,
-            top: 'calc(100% + 6px)',
+            /* Sidebar sits at bottom of viewport; opening down is clipped by layout overflow:hidden */
+            ...(variant === 'sidebar'
+              ? { bottom: 'calc(100% + 6px)', top: 'auto' }
+              : { top: 'calc(100% + 6px)' }),
             minWidth: compact ? 180 : undefined,
             padding: 6,
             borderRadius: 10,
