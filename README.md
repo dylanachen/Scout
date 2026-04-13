@@ -1,4 +1,4 @@
-# FreelanceOS — Frontend (Team Pylovers)
+# Scout — Frontend (Team Pylovers)
 
 **Angela Kang — Product / web + Android.**  
 DSCI 560: *Freelancer–Client AI Communication Platform* (chat, onboarding, scope guardian integration, invoices, matching, time tracking).
