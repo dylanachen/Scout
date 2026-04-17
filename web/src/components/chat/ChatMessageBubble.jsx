@@ -14,7 +14,7 @@ export default function ChatMessageBubble({ msg, role, viewerRole, isGroupStart 
 
   if (role === 'freelancer') {
     return (
-      <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%', animation: 'fos-slide-right 0.3s ease' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%', animation: 'scout-slide-right 0.3s ease' }}>
         <div style={{ maxWidth: '78%' }}>
           <div
             style={{
@@ -42,7 +42,7 @@ export default function ChatMessageBubble({ msg, role, viewerRole, isGroupStart 
     const initials = msg.sender_name?.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase() ?? '•';
     const bgColor = role === 'stakeholder' ? '#7c3aed' : '#64748b';
     return (
-      <div style={{ display: 'flex', gap: 10, flexDirection: 'row', maxWidth: '100%', alignItems: 'flex-end', animation: 'fos-slide-left 0.3s ease' }}>
+      <div style={{ display: 'flex', gap: 10, flexDirection: 'row', maxWidth: '100%', alignItems: 'flex-end', animation: 'scout-slide-left 0.3s ease' }}>
         {isGroupStart ? <Avatar initials={initials} bg={bgColor} /> : <div style={{ width: 30, flexShrink: 0 }} />}
         <div style={{ maxWidth: '72%' }}>
           {isGroupStart && (
@@ -74,7 +74,7 @@ export default function ChatMessageBubble({ msg, role, viewerRole, isGroupStart 
 
   if (role === 'ai_public') {
     return (
-      <div style={{ display: 'flex', gap: 10, flexDirection: 'row', maxWidth: '100%', alignItems: 'flex-end', animation: 'fos-slide-left 0.3s ease' }}>
+      <div style={{ display: 'flex', gap: 10, flexDirection: 'row', maxWidth: '100%', alignItems: 'flex-end', animation: 'scout-slide-left 0.3s ease' }}>
         {isGroupStart ? <AiAvatar /> : <div style={{ width: 30, flexShrink: 0 }} />}
         <div style={{ maxWidth: '78%' }}>
           {isGroupStart && (
@@ -106,7 +106,7 @@ export default function ChatMessageBubble({ msg, role, viewerRole, isGroupStart 
 
   /* ai_private — full-width amber/yellow card */
   return (
-    <div style={{ width: '100%', animation: 'fos-slide-left 0.3s ease' }}>
+    <div style={{ width: '100%', animation: 'scout-slide-left 0.3s ease' }}>
       <div
         style={{
           borderLeft: '4px solid var(--color-scope-border)',
@@ -190,7 +190,7 @@ function AiAvatar() {
         color: '#fff',
         flexShrink: 0,
       }}
-      title="FreelanceOS AI"
+      title="Scout AI"
     >
       AI
     </div>

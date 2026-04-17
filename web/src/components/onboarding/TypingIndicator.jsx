@@ -31,9 +31,9 @@ export default function TypingIndicator() {
         }}
         aria-label="Assistant is typing"
       >
-        <span className="fos-typing-dot" />
-        <span className="fos-typing-dot" style={{ animationDelay: '0.15s' }} />
-        <span className="fos-typing-dot" style={{ animationDelay: '0.3s' }} />
+        <span className="scout-typing-dot" />
+        <span className="scout-typing-dot" style={{ animationDelay: '0.15s' }} />
+        <span className="scout-typing-dot" style={{ animationDelay: '0.3s' }} />
       </div>
     </div>
   );

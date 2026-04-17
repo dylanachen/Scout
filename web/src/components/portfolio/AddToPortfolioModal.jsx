@@ -106,7 +106,7 @@ export default function AddToPortfolioModal({ open, project, messages, onClose, 
         message: permissionMessage,
       });
       try {
-        const key = `fos_perm_msg_${row.id}`;
+        const key = `scout_perm_msg_${row.id}`;
         localStorage.setItem(key, JSON.stringify({ message: permissionMessage, sentAt: new Date().toISOString() }));
       } catch {}
     }

@@ -48,8 +48,8 @@ export default function MatchResults() {
 
   useEffect(() => {
     const fn = () => setRepBump((x) => x + 1);
-    window.addEventListener('fos-reputation-updated', fn);
-    return () => window.removeEventListener('fos-reputation-updated', fn);
+    window.addEventListener('scout-reputation-updated', fn);
+    return () => window.removeEventListener('scout-reputation-updated', fn);
   }, []);
 
   const [apiMatches, setApiMatches] = useState(null);

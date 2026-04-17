@@ -190,8 +190,8 @@ export default function ChatWindow({ project, meetingInviteOpen, onMeetingInvite
   /* Catch-up banner: show after 24h+ away until dismissed (session-only dismiss) */
   useEffect(() => {
     if (!project?.id) return;
-    const exitKey = `fos_chat_exit_${project.id}`;
-    const dismissKey = `fos_catchup_dismissed_${project.id}`;
+    const exitKey = `scout_chat_exit_${project.id}`;
+    const dismissKey = `scout_catchup_dismissed_${project.id}`;
     const raw = localStorage.getItem(exitKey);
     if (raw == null) {
       localStorage.setItem(exitKey, String(Date.now()));
@@ -207,7 +207,7 @@ export default function ChatWindow({ project, meetingInviteOpen, onMeetingInvite
 
   useEffect(() => {
     return () => {
-      if (project?.id) localStorage.setItem(`fos_chat_exit_${project.id}`, String(Date.now()));
+      if (project?.id) localStorage.setItem(`scout_chat_exit_${project.id}`, String(Date.now()));
     };
   }, [project?.id]);
 
@@ -341,7 +341,7 @@ export default function ChatWindow({ project, meetingInviteOpen, onMeetingInvite
   }, [contextMenu]);
 
   const dismissCatchUp = () => {
-    if (project?.id) sessionStorage.setItem(`fos_catchup_dismissed_${project.id}`, '1');
+    if (project?.id) sessionStorage.setItem(`scout_catchup_dismissed_${project.id}`, '1');
     setShowCatchUp(false);
   };
 
@@ -664,7 +664,7 @@ export default function ChatWindow({ project, meetingInviteOpen, onMeetingInvite
           <CatchUpBanner
             bullets={[
               'Jordan asked for an additional hero variant before launch.',
-              'FreelanceOS AI reminded you about the Milestone 2 deadline.',
+              'Scout AI reminded you about the Milestone 2 deadline.',
               'You agreed to follow up with a mini change order.',
             ]}
             onDismiss={dismissCatchUp}

@@ -4,7 +4,7 @@ import { generateChecklistItemsFromBrief } from '../utils/assetChecklistFromBrie
 
 function loadClientOnboarding() {
   try {
-    const raw = sessionStorage.getItem('fos_onboarding_client');
+    const raw = sessionStorage.getItem('scout_onboarding_client');
     return raw ? JSON.parse(raw) : {};
   } catch {
     return {};
@@ -71,7 +71,7 @@ export default function AssetChecklist() {
       .map((i) => ({ id: i.id, label: i.label, dueDate: i.dueDate }));
     try {
       sessionStorage.setItem(
-        'fos_asset_checklist',
+        'scout_asset_checklist',
         JSON.stringify({
           items: items.map(({ id, label, status, dueDate, fileName }) => ({ id, label, status, dueDate, fileName })),
           reminders,
@@ -205,7 +205,7 @@ export default function AssetChecklist() {
       </button>
 
       <p style={{ fontSize: 12, color: 'var(--color-text-3)', marginTop: 14, lineHeight: 1.45 }}>
-        Items with future delivery dates are saved — FreelanceOS can remind you in chat when those dates arrive.
+        Items with future delivery dates are saved — Scout can remind you in chat when those dates arrive.
       </p>
     </div>
   );

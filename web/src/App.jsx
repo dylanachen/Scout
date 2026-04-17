@@ -95,7 +95,7 @@ function Layout() {
               zIndex: 30,
             }}
           >
-          <div style={{ fontWeight: 700, fontSize: 15, letterSpacing: '-.2px' }}>FreelanceOS</div>
+          <div style={{ fontWeight: 700, fontSize: 15, letterSpacing: '-.2px' }}>Scout</div>
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             <NavTimerIndicator />
             <NotificationBell />

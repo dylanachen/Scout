@@ -8,8 +8,9 @@ import {
   RefreshControl,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { isDemoMode } from '../api/demoAdapter';
 import { api } from '../api/client';
+import useDemoActive from '../hooks/useDemoActive';
+import FilterPillTabs, { type FilterPillTab } from '../components/FilterPillTabs';
 
 type NotifType =
   | 'match'
@@ -58,7 +59,16 @@ const DEMO_NOTIFICATIONS: Notification[] = [
   { id: '10', type: 'asset_reminder', title: 'Asset reminder', description: 'Final logo files due tomorrow for Brand Identity project', time: '4d', read: true },
 ];
 
-const FILTER_TABS = ['All', 'Unread', 'Scope', 'Invoices', 'Messages', 'Meetings'];
+type NotifFilterTab = 'All' | 'Unread' | 'Scope' | 'Invoices' | 'Messages' | 'Meetings';
+
+const FILTER_TABS: FilterPillTab<NotifFilterTab>[] = [
+  { value: 'All', label: 'All' },
+  { value: 'Unread', label: 'Unread' },
+  { value: 'Scope', label: 'Scope' },
+  { value: 'Invoices', label: 'Invoices' },
+  { value: 'Messages', label: 'Messages' },
+  { value: 'Meetings', label: 'Meetings' },
+];
 
 function NotifIcon({ type }: { type: NotifType }) {
   const cfg = ICON_CFG[type] ?? { bg: '#f1f5f9', color: '#64748b', icon: '\u2022' };
@@ -71,11 +81,15 @@ function NotifIcon({ type }: { type: NotifType }) {
 
 export default function NotificationsScreen() {
   const navigation = useNavigation<any>();
-  const [activeTab, setActiveTab] = useState('All');
-  const [notifications, setNotifications] = useState<Notification[]>(isDemoMode() ? DEMO_NOTIFICATIONS : []);
+  const demoActive = useDemoActive();
+  const [activeTab, setActiveTab] = useState<NotifFilterTab>('All');
+  const [notifications, setNotifications] = useState<Notification[]>([]);
 
   useEffect(() => {
-    if (isDemoMode()) return;
+    if (demoActive) {
+      setNotifications(DEMO_NOTIFICATIONS);
+      return;
+    }
     let cancelled = false;
     (async () => {
       try {
@@ -84,7 +98,7 @@ export default function NotificationsScreen() {
       } catch { /* backend unavailable */ }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [demoActive]);
   const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = () => {
@@ -140,17 +154,7 @@ export default function NotificationsScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabs} contentContainerStyle={styles.tabsContent}>
-        {FILTER_TABS.map((tab) => (
-          <TouchableOpacity
-            key={tab}
-            style={[styles.tab, activeTab === tab && styles.tabActive]}
-            onPress={() => setActiveTab(tab)}
-          >
-            <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>{tab}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      <FilterPillTabs tabs={FILTER_TABS} active={activeTab} onChange={setActiveTab} />
 
       <ScrollView
         contentContainerStyle={styles.list}
@@ -194,19 +198,6 @@ const styles = StyleSheet.create({
   },
   heading: { fontSize: 22, fontWeight: '700', color: '#0f1623' },
   markAll: { fontSize: 13, fontWeight: '600', color: '#1d6ecd' },
-  tabs: { flexGrow: 0, paddingHorizontal: 12 },
-  tabsContent: { gap: 8, paddingVertical: 8, paddingHorizontal: 4 },
-  tab: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#e2e6ed',
-    backgroundColor: '#fff',
-  },
-  tabActive: { backgroundColor: '#1d6ecd', borderColor: '#1d6ecd' },
-  tabText: { fontSize: 12, fontWeight: '500', color: '#4a5568' },
-  tabTextActive: { color: '#fff' },
   list: { padding: 16, gap: 2 },
 
   notifRow: {

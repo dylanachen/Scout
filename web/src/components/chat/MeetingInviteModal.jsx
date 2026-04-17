@@ -183,7 +183,7 @@ export default function MeetingInviteModal({ open, onClose, onInvite, projectNam
         </button>
 
         <p style={{ fontSize: 12, color: 'var(--color-text-3)', marginTop: 12, lineHeight: 1.45, textAlign: 'center' }}>
-          FreelanceOS AI will join your call as a silent participant
+          Scout AI will join your call as a silent participant
         </p>
 
         <div style={{ textAlign: 'center', marginTop: 8 }}>

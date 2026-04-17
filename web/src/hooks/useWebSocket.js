@@ -16,7 +16,7 @@ const DEMO_SEED = () => {
       id: 'demo-m-ai1',
       text: 'Reminder: Milestone 2 (“Homepage concepts”) is due in 3 days.',
       sender_id: -1,
-      sender_name: 'FreelanceOS AI',
+      sender_name: 'Scout AI',
       role: 'ai_public',
       created_at: new Date(t - 3_650_000).toISOString(),
     },
@@ -32,7 +32,7 @@ const DEMO_SEED = () => {
       id: 'demo-m-ai2',
       text: 'Tip: The client’s last message may touch scope — review revision limits before committing.',
       sender_id: -2,
-      sender_name: 'FreelanceOS AI',
+      sender_name: 'Scout AI',
       role: 'ai_private',
       created_at: new Date(t - 3_480_000).toISOString(),
     },
@@ -85,7 +85,7 @@ export function useWebSocket(projectId, onScopeAlert) {
     setConnected(false);
     setMessages([]);
 
-    const token = localStorage.getItem('fos_token');
+    const token = localStorage.getItem('scout_token');
     const base = (import.meta.env.VITE_WS_URL || 'ws://localhost:8000').replace(/\/$/, '');
     const url = `${base}/ws/chat/${projectId}?token=${encodeURIComponent(token || '')}`;
 

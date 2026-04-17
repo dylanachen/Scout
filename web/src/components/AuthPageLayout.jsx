@@ -1,4 +1,4 @@
-export function FreelanceLogo({ centered }) {
+export function ScoutLogo({ centered }) {
   return (
     <div
       style={{
@@ -24,9 +24,9 @@ export function FreelanceLogo({ centered }) {
           letterSpacing: '-0.5px',
         }}
       >
-        FO
+        S
       </div>
-      <div style={{ fontWeight: 700, fontSize: 17, letterSpacing: '-0.3px' }}>FreelanceOS</div>
+      <div style={{ fontWeight: 700, fontSize: 17, letterSpacing: '-0.3px' }}>Scout</div>
     </div>
   );
 }

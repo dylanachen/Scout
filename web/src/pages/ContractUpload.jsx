@@ -261,7 +261,7 @@ export default function ContractUpload() {
 
           {processing && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 14 }}>
-              <div className="fos-spinner fos-spinner--on-light" style={{ width: 20, height: 20 }} aria-hidden />
+              <div className="scout-spinner scout-spinner--on-light" style={{ width: 20, height: 20 }} aria-hidden />
               <span style={{ fontSize: 13, color: 'var(--color-text-2)' }}>Processing contract…</span>
             </div>
           )}

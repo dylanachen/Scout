@@ -1,8 +1,8 @@
 import { isDemoMode } from '../api/demoAdapter';
 
-const INVOICES_KEY = 'fos_invoices_v1';
-const SEQ_KEY = 'fos_invoice_seq_v1';
-const APPROVED_CO_KEY = 'fos_approved_change_orders_v1';
+const INVOICES_KEY = 'scout_invoices_v1';
+const SEQ_KEY = 'scout_invoice_seq_v1';
+const APPROVED_CO_KEY = 'scout_approved_change_orders_v1';
 
 function safeParse(json, fallback) {
   try {
@@ -293,7 +293,7 @@ export function getApprovedChangeOrders(projectId) {
   return [];
 }
 
-const DEFAULT_RATE_KEY = 'freelanceos_default_hourly_rate';
+const DEFAULT_RATE_KEY = 'scout_default_hourly_rate';
 
 export function loadDefaultHourlyRate() {
   try {

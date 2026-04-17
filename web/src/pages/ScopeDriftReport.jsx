@@ -51,7 +51,7 @@ const DATE_RANGES = [
 
 function parseRate() {
   try {
-    const raw = localStorage.getItem('freelanceos_default_hourly_rate');
+    const raw = localStorage.getItem('scout_default_hourly_rate');
     const n = parseFloat(String(raw ?? ''));
     if (Number.isFinite(n) && n > 0) return n;
   } catch {
@@ -126,7 +126,7 @@ export default function ScopeDriftReport() {
   const sortedFlags = useMemo(() => [...filteredFlags].sort((a, b) => (a.date < b.date ? 1 : -1)), [filteredFlags]);
 
   return (
-    <div className="main-scroll fos-scope-drift-print-root" style={{ flex: 1, overflowY: 'auto', padding: '20px 20px 88px' }}>
+    <div className="main-scroll scout-scope-drift-print-root" style={{ flex: 1, overflowY: 'auto', padding: '20px 20px 88px' }}>
       <div style={{ maxWidth: 960, margin: '0 auto' }}>
         <div
           style={{
@@ -140,7 +140,7 @@ export default function ScopeDriftReport() {
         >
           <div>
             <Link
-              className="fos-no-print"
+              className="scout-no-print"
               to="/projects"
               style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-primary)', textDecoration: 'none' }}
             >
@@ -154,7 +154,7 @@ export default function ScopeDriftReport() {
             <select
               value={dateRange}
               onChange={(e) => setDateRange(e.target.value)}
-              className="fos-no-print"
+              className="scout-no-print"
               style={{
                 padding: '10px 14px',
                 borderRadius: 10,
@@ -173,7 +173,7 @@ export default function ScopeDriftReport() {
             </select>
             <button
               type="button"
-              className="fos-no-print"
+              className="scout-no-print"
               onClick={exportPdf}
               style={{
                 padding: '10px 16px',
@@ -287,7 +287,7 @@ export default function ScopeDriftReport() {
         )}
 
         {projectId && (
-          <div className="fos-no-print" style={{ marginTop: 28, fontSize: 12, color: 'var(--color-text-3)' }}>
+          <div className="scout-no-print" style={{ marginTop: 28, fontSize: 12, color: 'var(--color-text-3)' }}>
             <Link to={`/projects/${projectId}/contract`} style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>
               Contract upload
             </Link>

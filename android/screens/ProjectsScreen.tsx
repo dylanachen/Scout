@@ -9,8 +9,8 @@ import {
   Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { isDemoMode } from '../api/demoAdapter';
 import { api } from '../api/client';
+import useDemoActive from '../hooks/useDemoActive';
 
 type Project = {
   id: string;
@@ -67,16 +67,21 @@ function ProjectCard({ project }: { project: Project }) {
 }
 
 export default function ProjectsScreen() {
+  const navigation = useNavigation<any>();
+  const demoActive = useDemoActive();
   const [refreshing, setRefreshing] = useState(false);
-  const [projects, setProjects] = useState<Project[]>(isDemoMode() ? DEMO_PROJECTS : []);
+  const [projects, setProjects] = useState<Project[]>([]);
 
   const fetchProjects = useCallback(async () => {
-    if (isDemoMode()) return;
+    if (demoActive) {
+      setProjects(DEMO_PROJECTS);
+      return;
+    }
     try {
       const { data } = await api.get('/projects');
       if (Array.isArray(data)) setProjects(data);
     } catch { /* backend unavailable */ }
-  }, []);
+  }, [demoActive]);
 
   useEffect(() => { fetchProjects(); }, [fetchProjects]);
 

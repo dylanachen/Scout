@@ -6,8 +6,9 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from 'react-native';
-import { isDemoMode } from '../api/demoAdapter';
 import { api } from '../api/client';
+import useDemoActive from '../hooks/useDemoActive';
+import FilterPillTabs from '../components/FilterPillTabs';
 
 type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue';
 
@@ -127,12 +128,16 @@ const FILTER_TABS: { label: string; value: InvoiceStatus | 'all' }[] = [
 ];
 
 export default function InvoiceListScreen() {
+  const demoActive = useDemoActive();
   const [activeFilter, setActiveFilter] = useState<InvoiceStatus | 'all'>('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [invoices, setInvoices] = useState<Invoice[]>(isDemoMode() ? DEMO_INVOICES : []);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
 
   useEffect(() => {
-    if (isDemoMode()) return;
+    if (demoActive) {
+      setInvoices(DEMO_INVOICES);
+      return;
+    }
     let cancelled = false;
     (async () => {
       try {
@@ -141,7 +146,7 @@ export default function InvoiceListScreen() {
       } catch { /* backend unavailable */ }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [demoActive]);
 
   const filtered = activeFilter === 'all'
     ? invoices
@@ -155,17 +160,7 @@ export default function InvoiceListScreen() {
     <View style={s.container}>
       <Text style={s.heading}>Invoices</Text>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.tabs} contentContainerStyle={s.tabsContent}>
-        {FILTER_TABS.map((tab) => (
-          <TouchableOpacity
-            key={tab.value}
-            style={[s.tab, activeFilter === tab.value && s.tabActive]}
-            onPress={() => setActiveFilter(tab.value)}
-          >
-            <Text style={[s.tabText, activeFilter === tab.value && s.tabTextActive]}>{tab.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      <FilterPillTabs tabs={FILTER_TABS} active={activeFilter} onChange={setActiveFilter} />
 
       <ScrollView contentContainerStyle={s.list}>
         {filtered.length === 0 ? (
@@ -255,12 +250,6 @@ export default function InvoiceListScreen() {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f6f8fb' },
   heading: { fontSize: 22, fontWeight: '700', color: '#0f1623', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
-  tabs: { flexGrow: 0, paddingHorizontal: 12 },
-  tabsContent: { gap: 8, paddingVertical: 8, paddingHorizontal: 4 },
-  tab: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: '#e2e6ed', backgroundColor: '#fff' },
-  tabActive: { backgroundColor: '#1d6ecd', borderColor: '#1d6ecd' },
-  tabText: { fontSize: 12, fontWeight: '500', color: '#4a5568' },
-  tabTextActive: { color: '#fff' },
   list: { padding: 16, gap: 2 },
   invoiceRow: { backgroundColor: '#fff', padding: 14, borderRadius: 10, borderWidth: 1, borderColor: '#e2e6ed', marginBottom: 8 },
   overdueBorder: { borderLeftWidth: 3, borderLeftColor: '#dc2626' },

@@ -1,6 +1,6 @@
 /** Client-side prefs (notifications, scope, rates, communication) — keyed by user id. */
 
-const KEY = (id) => `fos_user_settings_${id}`;
+const KEY = (id) => `scout_user_settings_${id}`;
 
 const defaultNotificationTypes = () => ({
   new_messages: { enabled: true, email: false },

@@ -68,7 +68,7 @@ function ConfettiBurst() {
       {pieces.map((p, i) => (
         <span
           key={i}
-          className="fos-confetti-piece"
+          className="scout-confetti-piece"
           style={{
             left: p.left,
             animationDelay: `${p.delay}s`,
@@ -117,7 +117,7 @@ export default function MatchConfirmation() {
       {showBurst ? <ConfettiBurst /> : null}
 
       <div
-        className="fos-match-check-wrap"
+        className="scout-match-check-wrap"
         style={{
           width: 72,
           height: 72,
@@ -130,7 +130,7 @@ export default function MatchConfirmation() {
           boxShadow: '0 8px 28px rgba(22, 163, 74, 0.35)',
         }}
       >
-        <svg className="fos-match-check" width="36" height="36" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <svg className="scout-match-check" width="36" height="36" viewBox="0 0 24 24" fill="none" aria-hidden>
           <path
             d="M5 12.5l4.5 4.5L19 7"
             stroke="#fff"

@@ -1,15 +1,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { InternalAxiosRequestConfig } from 'axios';
 
-export const DEMO_TOKEN = 'freelanceos-demo-token';
-export const DEMO_SESSION_KEY = 'fos_demo_session';
+export const DEMO_TOKEN = 'scout-demo-token';
+export const DEMO_SESSION_KEY = 'scout_demo_session';
 export const DEMO_CREDENTIALS_PASSWORD = 'test';
 export const DEMO_FREELANCER_USER = 'freelancer';
 export const DEMO_CLIENT_USER = 'client';
 
 const FREELANCER_PROFILE = {
   id: 1,
-  email: 'freelancer.demo@freelanceos.local',
+  email: 'freelancer.demo@scout.local',
   name: 'Angela Kang',
   role: 'freelancer' as const,
   avatar_url: null as string | null,
@@ -17,7 +17,7 @@ const FREELANCER_PROFILE = {
 
 const CLIENT_PROFILE = {
   id: 2,
-  email: 'client.demo@freelanceos.local',
+  email: 'client.demo@scout.local',
   name: 'Jordan Lee',
   role: 'client' as const,
   avatar_url: null as string | null,
@@ -116,7 +116,7 @@ function resolveDemo(config: InternalAxiosRequestConfig) {
     const email = String(body.email ?? '')
       .trim()
       .toLowerCase();
-    if (email === 'notfound@freelanceos.local') {
+    if (email === 'notfound@scout.local') {
       return { status: 404, data: { detail: 'No account found for this email.' } };
     }
     return { status: 200, data: { ok: true } };
@@ -185,6 +185,6 @@ export async function shouldUseDemoAdapter(): Promise<boolean> {
   if (isDemoMode()) return true;
   const flag = await AsyncStorage.getItem(DEMO_SESSION_KEY);
   if (flag === '1') return true;
-  const tok = await AsyncStorage.getItem('fos_token');
+  const tok = await AsyncStorage.getItem('scout_token');
   return tok === DEMO_TOKEN;
 }

@@ -25,7 +25,7 @@ export default function OnboardingFreelancer() {
   return (
     <OnboardingChatScreen
       steps={FREELANCER_STEPS}
-      storageKey="fos_onboarding_freelancer"
+      storageKey="scout_onboarding_freelancer"
       firstName={firstName}
       showBuildProfileFinale
       buildProfileMessage={`Perfect, ${firstName || 'friend'} — I've got everything I need. Building your profile now…`}

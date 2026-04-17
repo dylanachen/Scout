@@ -49,7 +49,7 @@ export default function SettingsHome() {
 
       <h1 style={{ fontSize: 24, fontWeight: 600, margin: '0 0 8px' }}>Settings</h1>
       <p style={{ fontSize: 14, color: 'var(--color-text-3)', marginBottom: 28 }}>
-        Manage notifications, billing defaults, and how FreelanceOS works for you.
+        Manage notifications, billing defaults, and how Scout works for you.
       </p>
 
       <Link

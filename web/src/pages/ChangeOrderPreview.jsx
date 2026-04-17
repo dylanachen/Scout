@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useProjectFromParams } from '../hooks/useProjectFromParams';
 import { formatShortDate } from '../utils/dashboard';
 
-const RATE_STORAGE = 'freelanceos_default_hourly_rate';
+const RATE_STORAGE = 'scout_default_hourly_rate';
 
 function loadDefaultRate() {
   try {
@@ -117,7 +117,7 @@ export default function ChangeOrderPreview() {
             <div style={{ fontSize: 17, fontWeight: 800, marginTop: 6, letterSpacing: '-0.02em' }}>{projectName}</div>
             <div style={{ fontSize: 13, color: 'var(--color-text-2)', marginTop: 4 }}>{today}</div>
           </div>
-          <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--color-primary)', letterSpacing: '-0.02em' }}>FreelanceOS</div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--color-primary)', letterSpacing: '-0.02em' }}>Scout</div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>

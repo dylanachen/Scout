@@ -3,7 +3,7 @@
 export function getLocalProjectStatus(projectId) {
   if (projectId == null) return null;
   try {
-    return localStorage.getItem(`fos_project_status_${projectId}`);
+    return localStorage.getItem(`scout_project_status_${projectId}`);
   } catch {
     return null;
   }
@@ -12,7 +12,7 @@ export function getLocalProjectStatus(projectId) {
 export function setLocalProjectStatus(projectId, status) {
   if (projectId == null) return;
   try {
-    localStorage.setItem(`fos_project_status_${projectId}`, String(status));
+    localStorage.setItem(`scout_project_status_${projectId}`, String(status));
   } catch {
     /* ignore */
   }

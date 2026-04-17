@@ -4,7 +4,7 @@ import { isDemoMode } from '../api/demoAdapter';
 import { DEMO_NOTIFICATION_SEEDS } from '../data/demoNotifications';
 import { normalizeNotification } from '../utils/notificationModel';
 
-const STORAGE_KEY = 'fos-notifications-read-v1';
+const STORAGE_KEY = 'scout-notifications-read-v1';
 
 function loadReadIds() {
   try {
@@ -76,7 +76,7 @@ export function NotificationsProvider({ children }) {
   );
 
   useEffect(() => {
-    document.title = unreadCount > 0 ? `(${unreadCount}) FreelanceOS` : 'FreelanceOS';
+    document.title = unreadCount > 0 ? `(${unreadCount}) Scout` : 'Scout';
   }, [unreadCount]);
 
   return <NotificationsContext.Provider value={value}>{children}</NotificationsContext.Provider>;

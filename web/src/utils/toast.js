@@ -11,13 +11,13 @@ const ICONS = {
  */
 export function showToast(message, type = 'info') {
   const el = document.createElement('div');
-  el.className = `fos-toast fos-toast--${type}`;
+  el.className = `scout-toast scout-toast--${type}`;
   el.innerHTML = `<span style="display:inline-flex">${ICONS[type] || ICONS.info}</span><span>${message}</span>`;
   el.setAttribute('role', 'status');
   el.setAttribute('aria-live', 'polite');
 
   const dismiss = () => {
-    el.classList.add('fos-toast--leaving');
+    el.classList.add('scout-toast--leaving');
     setTimeout(() => el.remove(), 250);
   };
 

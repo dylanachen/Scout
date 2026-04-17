@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { Link, useNavigate, Navigate } from 'react-router-dom';
-import AuthPageLayout, { FreelanceLogo } from '../components/AuthPageLayout';
+import AuthPageLayout, { ScoutLogo } from '../components/AuthPageLayout';
 import PasswordField from '../components/PasswordField';
 import { useAuth } from '../hooks/useAuth';
 import { formatAuthError } from '../utils/authErrors';
@@ -132,7 +132,7 @@ export default function SignUp() {
   return (
     <AuthPageLayout>
       <div style={{ textAlign: 'center' }}>
-        <FreelanceLogo centered />
+        <ScoutLogo centered />
       </div>
       <h1 style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.3px', marginBottom: 6, marginTop: 0 }}>
         Create your account
@@ -145,7 +145,7 @@ export default function SignUp() {
         <p style={{ fontSize: 13, color: 'var(--color-danger)', marginBottom: 14 }}>{formError}</p>
       ) : null}
 
-      <form ref={formRef} onSubmit={handleSubmit} className={shaking ? 'fos-shake' : ''}>
+      <form ref={formRef} onSubmit={handleSubmit} className={shaking ? 'scout-shake' : ''}>
         {/* Full name */}
         <label
           htmlFor="su-name"
@@ -376,7 +376,7 @@ export default function SignUp() {
         >
           {loading ? (
             <>
-              <span className="fos-spinner" aria-hidden style={{ marginRight: 8 }} />
+              <span className="scout-spinner" aria-hidden style={{ marginRight: 8 }} />
               Creating your account…
             </>
           ) : (

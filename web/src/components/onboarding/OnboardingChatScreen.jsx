@@ -288,7 +288,7 @@ export default function OnboardingChatScreen({
         {messages.map((msg, i) => (
           <div
             key={i}
-            className={msg.role === 'user' ? 'fos-slide-in-right' : 'fos-slide-in-left'}
+            className={msg.role === 'user' ? 'scout-slide-in-right' : 'scout-slide-in-left'}
             style={{
               display: 'flex',
               gap: 10,
@@ -331,7 +331,7 @@ export default function OnboardingChatScreen({
                 fontWeight: 500,
               }}
             >
-              <div className="fos-spinner fos-spinner--on-light" style={{ width: 28, height: 28, borderWidth: 3 }} />
+              <div className="scout-spinner scout-spinner--on-light" style={{ width: 28, height: 28, borderWidth: 3 }} />
               {buildProfileMessage}
             </div>
           </div>

@@ -18,7 +18,7 @@ export const FREELANCER_STEPS = [
   {
     id: 'welcome',
     assistantText:
-      "Hey {{firstName}} 👋 I'm your FreelanceOS AI. I'm going to ask you a few quick questions so we can build your profile and find you the right clients. It'll take about 3 minutes. Ready?",
+      "Hey {{firstName}} 👋 I'm your Scout AI. I'm going to ask you a few quick questions so we can build your profile and find you the right clients. It'll take about 3 minutes. Ready?",
     inputType: 'chips',
     chips: ["Let's go", 'Sure'],
   },
@@ -117,7 +117,7 @@ export const CLIENT_STEPS = [
   {
     id: 'welcome',
     assistantText:
-      "Hey {{firstName}} 👋 I'm your FreelanceOS AI. Let's figure out exactly what you need so I can match you with the right freelancer. This takes about 3 minutes. Ready?",
+      "Hey {{firstName}} 👋 I'm your Scout AI. Let's figure out exactly what you need so I can match you with the right freelancer. This takes about 3 minutes. Ready?",
     inputType: 'chips',
     chips: ["Let's go", 'Sure'],
   },

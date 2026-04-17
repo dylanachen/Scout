@@ -27,7 +27,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    const token = localStorage.getItem('fos_token');
+    const token = localStorage.getItem('scout_token');
     if (!token) {
       setLoading(false);
       return;
@@ -36,7 +36,7 @@ export function AuthProvider({ children }) {
       .get('/auth/me')
       .then((res) => setUser(res.data))
       .catch(() => {
-        localStorage.removeItem('fos_token');
+        localStorage.removeItem('scout_token');
         localStorage.removeItem(DEMO_SESSION_KEY);
       })
       .finally(() => setLoading(false));
@@ -46,13 +46,13 @@ export function AuthProvider({ children }) {
     if (isFixedDemoLogin(email, password)) {
       localStorage.setItem(DEMO_SESSION_KEY, '1');
       const { data } = await api.post('/auth/login', { email: String(email).trim(), password });
-      localStorage.setItem('fos_token', data.access_token ?? data.token);
+      localStorage.setItem('scout_token', data.access_token ?? data.token);
       await refreshUser();
       return;
     }
     const { data } = await api.post('/auth/login', { email, password });
     localStorage.removeItem(DEMO_SESSION_KEY);
-    localStorage.setItem('fos_token', data.access_token ?? data.token);
+    localStorage.setItem('scout_token', data.access_token ?? data.token);
     await refreshUser();
   };
 
@@ -68,7 +68,7 @@ export function AuthProvider({ children }) {
   };
 
   const logout = () => {
-    localStorage.removeItem('fos_token');
+    localStorage.removeItem('scout_token');
     localStorage.removeItem(DEMO_SESSION_KEY);
     setUser(null);
   };

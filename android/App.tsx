@@ -24,8 +24,8 @@ import InvoiceListScreen from './screens/InvoiceListScreen';
 import PortfolioScreen from './screens/PortfolioScreen';
 import RateClientScreen from './screens/RateClientScreen';
 
-const HAS_VISITED_KEY = 'fos_has_visited';
-const NEEDS_ONBOARDING_KEY = 'fos_needs_onboarding';
+const HAS_VISITED_KEY = 'scout_has_visited';
+const NEEDS_ONBOARDING_KEY = 'scout_needs_onboarding';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -115,7 +115,7 @@ function MainTabs({ initialTab }: { initialTab?: string }) {
         options={{
           tabBarLabel: 'Dashboard',
           tabBarIcon: ({ color }) => <TabIconGrid color={color} />,
-          headerTitle: 'FreelanceOS',
+          headerTitle: 'Scout',
         }}
       />
       <Tab.Screen
@@ -175,7 +175,7 @@ function SplashScreen({ onComplete }: { onComplete: (target: 'carousel' | 'login
 
     const timer = setTimeout(async () => {
       const hasVisited = await AsyncStorage.getItem(HAS_VISITED_KEY);
-      const hasToken = await AsyncStorage.getItem('fos_token');
+      const hasToken = await AsyncStorage.getItem('scout_token');
       if (hasToken || hasVisited) {
         onComplete('login');
       } else {
@@ -191,9 +191,9 @@ function SplashScreen({ onComplete }: { onComplete: (target: 'carousel' | 'login
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1d6ecd' }}>
       <Animated.View style={{ alignItems: 'center', opacity: fadeAnim, transform: [{ scale: scaleAnim }] }}>
         <View style={{ width: 72, height: 72, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
-          <Text style={{ color: '#fff', fontSize: 26, fontWeight: '800' }}>FO</Text>
+          <Text style={{ color: '#fff', fontSize: 26, fontWeight: '800' }}>S</Text>
         </View>
-        <Text style={{ color: '#fff', fontSize: 22, fontWeight: '700', letterSpacing: -0.4 }}>FreelanceOS</Text>
+        <Text style={{ color: '#fff', fontSize: 22, fontWeight: '700', letterSpacing: -0.4 }}>Scout</Text>
       </Animated.View>
     </View>
   );
@@ -208,7 +208,7 @@ export default function App() {
   const [initialTab, setInitialTab] = useState('Dashboard');
 
   const signOut = useCallback(async () => {
-    await AsyncStorage.multiRemove(['fos_token', 'fos_user_id', 'fos_demo_session', NEEDS_ONBOARDING_KEY]);
+    await AsyncStorage.multiRemove(['scout_token', 'scout_user_id', 'scout_demo_session', NEEDS_ONBOARDING_KEY]);
     setUser(null);
     setNeedsOnboarding(false);
     setAuthState('unauthed');
@@ -219,26 +219,26 @@ export default function App() {
 
   useEffect(() => {
     if (!__DEV__) return;
-    DevSettings.addMenuItem('FreelanceOS: Sign out', () => {
+    DevSettings.addMenuItem('Scout: Sign out', () => {
       void signOutRef.current();
     });
   }, []);
 
   const refreshAuth = useCallback(async () => {
-    const token = await AsyncStorage.getItem('fos_token');
+    const token = await AsyncStorage.getItem('scout_token');
     if (!token) {
       setAuthState('unauthed');
       return;
     }
     try {
       const res = await authApi.me();
-      await AsyncStorage.setItem('fos_user_id', String(res.data.id));
+      await AsyncStorage.setItem('scout_user_id', String(res.data.id));
       setUser(res.data);
       const onboard = await AsyncStorage.getItem(NEEDS_ONBOARDING_KEY);
       setNeedsOnboarding(onboard === '1');
       setAuthState('authed');
     } catch {
-      await AsyncStorage.multiRemove(['fos_token', 'fos_demo_session']);
+      await AsyncStorage.multiRemove(['scout_token', 'scout_demo_session']);
       setAuthState('unauthed');
     }
   }, []);
@@ -276,10 +276,10 @@ export default function App() {
   }, []);
 
   const handleOnboardingComplete = useCallback(async (role?: string) => {
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    await AsyncStorage.removeItem(NEEDS_ONBOARDING_KEY);
     if (role === 'client') setInitialTab('Matches');
+    // Switch out of onboarding immediately, then clean up persisted flag.
     setNeedsOnboarding(false);
+    await AsyncStorage.removeItem(NEEDS_ONBOARDING_KEY);
   }, []);
 
   if (authState === 'splash') {
@@ -290,7 +290,7 @@ export default function App() {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0f1623' }}>
         <View style={{ width: 48, height: 48, backgroundColor: '#1d6ecd', borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-          <Text style={{ color: '#fff', fontSize: 18, fontWeight: '700' }}>FO</Text>
+          <Text style={{ color: '#fff', fontSize: 18, fontWeight: '700' }}>S</Text>
         </View>
       </View>
     );

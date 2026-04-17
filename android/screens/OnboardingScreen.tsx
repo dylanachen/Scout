@@ -34,7 +34,7 @@ interface OnboardingStep {
 }
 
 const FREELANCER_STEPS: OnboardingStep[] = [
-  { id: 'welcome', assistantText: "Hey {{firstName}} \u{1F44B} I'm your FreelanceOS AI. I'm going to ask you a few quick questions so we can build your profile and find you the right clients. It'll take about 3 minutes. Ready?", inputType: 'chips', chips: ["Let's go", 'Sure'] },
+  { id: 'welcome', assistantText: "Hey {{firstName}} \u{1F44B} I'm your Scout AI. I'm going to ask you a few quick questions so we can build your profile and find you the right clients. It'll take about 3 minutes. Ready?", inputType: 'chips', chips: ["Let's go", 'Sure'] },
   { id: 'specialty', assistantText: 'What type of freelance work do you do?', inputType: 'tools', chips: ['UI/UX Design', 'Web Development', 'Video Editing', 'Copywriting & Content', 'Branding & Graphic Design', 'Consulting', 'Photography', 'Motion Graphics', 'Other'], placeholder: 'Tell me what you do' },
   { id: 'tools', assistantText: 'Nice! What tools do you use most in your work?', inputType: 'tools', conditionalOn: 'specialty', conditionalChips: { 'UI/UX Design': ['Figma', 'Adobe XD', 'Sketch', 'Framer', 'Webflow', 'Other'], 'Web Development': ['React', 'Vue', 'Node', 'Python', 'Flutter', 'Other'], 'Video Editing': ['Premiere Pro', 'Final Cut', 'DaVinci Resolve', 'After Effects', 'CapCut', 'Other'], 'Copywriting & Content': ['Google Docs', 'Notion', 'WordPress', 'Substack', 'Other'] }, chips: ['Figma', 'Adobe XD', 'Sketch', 'Framer', 'Webflow', 'React', 'Vue', 'Node', 'Python', 'Premiere Pro', 'Final Cut', 'Google Docs', 'Notion', 'Other'], placeholder: 'Add a tool' },
   { id: 'experience', assistantText: 'How long have you been freelancing?', inputType: 'chips', chips: ['Less than 1 year', '1\u20133 years', '3\u20135 years', '5\u201310 years', '10+ years'] },
@@ -47,7 +47,7 @@ const FREELANCER_STEPS: OnboardingStep[] = [
 ];
 
 const CLIENT_STEPS: OnboardingStep[] = [
-  { id: 'welcome', assistantText: "Hey {{firstName}} \u{1F44B} I'm your FreelanceOS AI. Let's figure out exactly what you need so I can match you with the right freelancer. This takes about 3 minutes. Ready?", inputType: 'chips', chips: ["Let's go", 'Sure'] },
+  { id: 'welcome', assistantText: "Hey {{firstName}} \u{1F44B} I'm your Scout AI. Let's figure out exactly what you need so I can match you with the right freelancer. This takes about 3 minutes. Ready?", inputType: 'chips', chips: ["Let's go", 'Sure'] },
   { id: 'brief_seed', assistantText: 'Tell me about your project. What do you need help with?', inputType: 'text', placeholder: 'E.g. I need a brand identity designed for my new startup' },
   { id: 'freelancer_type', assistantText: 'Got it. What type of freelancer are you looking for?', inputType: 'tools', chips: ['UI/UX Designer', 'Web Developer', 'Video Editor', 'Copywriter', 'Brand Designer', 'Consultant', 'Photographer', 'Motion Designer', 'Not sure \u2014 recommend one'], placeholder: 'Tell me what you need' },
   { id: 'timeline', assistantText: 'When do you need this done by?', inputType: 'chips', chips: ['ASAP (under 1 week)', '2\u20134 weeks', '1\u20133 months', '3+ months', 'Flexible'] },
@@ -119,6 +119,7 @@ export default function OnboardingScreen({ navigation, onComplete }: Props) {
   const [input, setInput] = useState('');
   const [selectedChips, setSelectedChips] = useState<string[]>([]);
   const answers = useRef<Record<string, string>>({});
+  const finishingRef = useRef(false);
 
   const scrollRef = useRef<ScrollView>(null);
   const inputRef = useRef<TextInput>(null);
@@ -149,17 +150,24 @@ export default function OnboardingScreen({ navigation, onComplete }: Props) {
     return text.replace('{{firstName}}', firstName);
   }, [firstName]);
 
+  const finishOnboarding = useCallback(async () => {
+    if (finishingRef.current) return;
+    finishingRef.current = true;
+    setPhase('done');
+    await onComplete(userRole);
+    navigation.reset({ index: 0, routes: [{ name: 'Tabs' }] });
+  }, [onComplete, userRole, navigation]);
+
   const advanceToNext = useCallback((fromIdx: number) => {
     let next = fromIdx + 1;
     while (next < steps.length && shouldSkipStep(steps[next])) next++;
     if (next >= steps.length) {
-      setPhase('done');
-      void onComplete(userRole);
+      void finishOnboarding();
     } else {
       setStepIndex(next);
       setPhase('typing');
     }
-  }, [steps, shouldSkipStep, onComplete, userRole]);
+  }, [steps, shouldSkipStep, finishOnboarding]);
 
   useEffect(() => {
     if (phase !== 'typing') return;
@@ -197,13 +205,12 @@ export default function OnboardingScreen({ navigation, onComplete }: Props) {
       }
 
       if (stepIndex >= steps.length - 1) {
-        setPhase('done');
-        await onComplete(userRole);
+        await finishOnboarding();
       } else {
         advanceToNext(stepIndex);
       }
     },
-    [stepIndex, steps, onComplete, userRole, advanceToNext],
+    [stepIndex, steps, finishOnboarding, advanceToNext],
   );
 
   const handleChipPress = useCallback(

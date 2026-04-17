@@ -389,7 +389,7 @@ export default function ProfileSettings() {
             minHeight: 44,
           }}
         >
-          {saveLoading ? <span className="fos-spinner" aria-hidden /> : 'Save Changes'}
+          {saveLoading ? <span className="scout-spinner" aria-hidden /> : 'Save Changes'}
         </button>
       </form>
 

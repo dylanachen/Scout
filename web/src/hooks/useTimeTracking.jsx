@@ -62,7 +62,7 @@ export function TimeTrackingProvider({ children }) {
 
   useEffect(() => {
     const onStorage = (e) => {
-      if (e.key === 'fos_time_session_v1' || e.key === 'fos_time_entries_v1') {
+      if (e.key === 'scout_time_session_v1' || e.key === 'scout_time_entries_v1') {
         setSessionState(getTimerSession());
         setEntries(getTimeEntries());
       }

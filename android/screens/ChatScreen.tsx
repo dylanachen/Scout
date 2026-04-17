@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../api/client';
-import { isDemoMode } from '../api/demoAdapter';
+import { isDemoMode, shouldUseDemoAdapter } from '../api/demoAdapter';
 import ScopeAlert, { type ScopeAlertPayload } from '../components/ScopeAlert';
 
 type Msg = {
@@ -66,7 +66,7 @@ const DEMO_CHAT_SEED = (): Msg[] => [
     id: 'demo-m5',
     text: "I've flagged this as potential scope creep. The original contract covers 2 revision rounds.",
     sender_id: 0,
-    sender_name: 'FreelanceOS AI',
+    sender_name: 'Scout AI',
     timestamp: '2025-04-08T09:20:00',
     read: false,
     role: 'ai_public',
@@ -75,7 +75,7 @@ const DEMO_CHAT_SEED = (): Msg[] => [
     id: 'demo-m6',
     text: 'Scope flag: Client is requesting a 3rd revision. Your contract allows 2. Consider sending a change order.',
     sender_id: 0,
-    sender_name: 'FreelanceOS AI',
+    sender_name: 'Scout AI',
     timestamp: '2025-04-08T09:21:00',
     read: false,
     role: 'ai_private',
@@ -182,10 +182,26 @@ export default function ChatScreen({ navigation, route }: Props) {
   const [scopeAlerts, setScopeAlerts] = useState<ScopeAlertPayload[]>([]);
   const [input, setInput] = useState('');
   const [connected, setConnected] = useState(false);
+  const [demoActive, setDemoActive] = useState(isDemoMode());
   const [menuOpen, setMenuOpen] = useState(false);
   const [catchUpDismissed, setCatchUpDismissed] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const scrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const enabled = await shouldUseDemoAdapter();
+        if (!cancelled) setDemoActive(enabled);
+      } catch {
+        if (!cancelled) setDemoActive(isDemoMode());
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   /* ── project resolution ── */
   useEffect(() => {
@@ -208,10 +224,10 @@ export default function ChatScreen({ navigation, route }: Props) {
 
   /* ── websocket ── */
   const connect = useCallback(async () => {
-    if (isDemoMode()) return;
+    if (demoActive) return;
     wsRef.current?.close();
     if (!projectId) return;
-    const token = (await AsyncStorage.getItem('fos_token')) ?? '';
+    const token = (await AsyncStorage.getItem('scout_token')) ?? '';
     const base = (process.env.EXPO_PUBLIC_WS_URL ?? 'ws://10.0.2.2:8000').replace(/\/$/, '');
     const url = `${base}/ws/chat/${projectId}?token=${encodeURIComponent(token)}`;
     const ws = new WebSocket(url);
@@ -230,7 +246,7 @@ export default function ChatScreen({ navigation, route }: Props) {
         }
       } catch { /* ignore */ }
     };
-  }, [projectId]);
+  }, [projectId, demoActive]);
 
   useEffect(() => {
     if (!projectId) {
@@ -239,7 +255,7 @@ export default function ChatScreen({ navigation, route }: Props) {
       setConnected(false);
       return;
     }
-    if (isDemoMode()) {
+    if (demoActive) {
       setMessages(DEMO_CHAT_SEED());
       setConnected(true);
       return;
@@ -248,7 +264,7 @@ export default function ChatScreen({ navigation, route }: Props) {
     setMessages([]);
     connect();
     return () => wsRef.current?.close();
-  }, [projectId, connect]);
+  }, [projectId, connect, demoActive]);
 
   useEffect(() => {
     requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
@@ -260,7 +276,7 @@ export default function ChatScreen({ navigation, route }: Props) {
   const send = () => {
     const t = input.trim();
     if (!t) return;
-    if (isDemoMode()) {
+    if (demoActive) {
       setMessages((m) => [...m, {
         id: `demo-local-${Date.now()}`,
         text: t,
@@ -320,7 +336,7 @@ export default function ChatScreen({ navigation, route }: Props) {
       <View style={styles.emptyWrap}>
         <Text style={styles.muted}>No projects loaded.</Text>
         <Text style={[styles.muted, { marginTop: 10 }]}>
-          {isDemoMode() ? 'Try signing in again.' : 'Start FastAPI or enable EXPO_PUBLIC_DEMO_MODE=true.'}
+          {demoActive ? 'Try signing in again.' : 'Start FastAPI or enable EXPO_PUBLIC_DEMO_MODE=true.'}
         </Text>
       </View>
     );

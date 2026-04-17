@@ -78,9 +78,9 @@ export default function ForgotPasswordScreen() {
 
           <View style={{ alignItems: 'center', marginBottom: 16 }}>
             <View style={styles.logo}>
-              <Text style={styles.logoText}>FO</Text>
+              <Text style={styles.logoText}>S</Text>
             </View>
-            <Text style={styles.brand}>FreelanceOS</Text>
+            <Text style={styles.brand}>Scout</Text>
           </View>
 
           {success ? (

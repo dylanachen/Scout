@@ -171,7 +171,7 @@ export default function StakeholderInviteModal({ open, onClose, projectName, par
               fontSize: 13,
               fontWeight: 500,
               textAlign: 'center',
-              animation: 'fos-fade-in 0.25s ease',
+              animation: 'scout-fade-in 0.25s ease',
             }}
           >
             {toast}

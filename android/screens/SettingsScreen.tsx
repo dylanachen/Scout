@@ -92,7 +92,7 @@ export default function SettingsScreen() {
   const { user } = useAuth();
 
   const userName = user?.name || 'User';
-  const userEmail = user?.email || 'user@freelanceos.com';
+  const userEmail = user?.email || 'user@scout.com';
   const userInitial = userName.charAt(0).toUpperCase();
 
   const [expandedSection, setExpandedSection] = useState<string | null>(null);

@@ -1,6 +1,6 @@
 /** Client testimonials; “pending review” simulated with a short delay flag. */
 
-const KEY = 'fos_testimonials_v1';
+const KEY = 'scout_testimonials_v1';
 
 function read() {
   try {

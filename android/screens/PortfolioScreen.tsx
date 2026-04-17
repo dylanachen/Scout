@@ -10,8 +10,8 @@ import {
   Dimensions,
   Switch,
 } from 'react-native';
-import { isDemoMode } from '../api/demoAdapter';
 import { api } from '../api/client';
+import useDemoActive from '../hooks/useDemoActive';
 
 const SCREEN_W = Dimensions.get('window').width;
 const CARD_W = (SCREEN_W - 48) / 2;
@@ -44,10 +44,14 @@ const DELIVERABLE_TYPES = ['Web Design', 'Branding', 'Presentation', 'UI/UX', 'L
 const SKILL_OPTIONS = ['Figma', 'React', 'Illustrator', 'Prototyping', 'Typography', 'Responsive', 'Keynote', 'Copywriting', 'iOS', 'CSS'];
 
 export default function PortfolioScreen() {
-  const [items, setItems] = useState<PortfolioItem[]>(isDemoMode() ? DEMO_ITEMS : []);
+  const demoActive = useDemoActive();
+  const [items, setItems] = useState<PortfolioItem[]>([]);
 
   useEffect(() => {
-    if (isDemoMode()) return;
+    if (demoActive) {
+      setItems(DEMO_ITEMS);
+      return;
+    }
     let cancelled = false;
     (async () => {
       try {
@@ -56,7 +60,7 @@ export default function PortfolioScreen() {
       } catch { /* backend unavailable */ }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [demoActive]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);

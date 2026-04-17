@@ -1,7 +1,7 @@
 /** Portfolio items + showcase permission requests (client). */
 
-const PORTFOLIO_KEY = 'fos_portfolio_items_v1';
-const PERM_KEY = 'fos_portfolio_permission_requests_v1';
+const PORTFOLIO_KEY = 'scout_portfolio_items_v1';
+const PERM_KEY = 'scout_portfolio_permission_requests_v1';
 
 function readJson(key, fallback) {
   try {

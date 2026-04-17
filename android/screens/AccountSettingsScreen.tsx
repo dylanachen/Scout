@@ -186,7 +186,7 @@ export default function AccountSettingsScreen({ navigation, onSignedOut }: Props
     setDeleteLoading(true);
     try {
       await authApi.deleteMe();
-      await AsyncStorage.multiRemove(['fos_token', 'fos_user_id']);
+      await AsyncStorage.multiRemove(['scout_token', 'scout_user_id']);
       closeDeleteSheet();
       await onSignedOut();
     } catch {

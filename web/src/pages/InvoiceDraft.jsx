@@ -57,7 +57,7 @@ function InvoicePreviewBody({
     <div style={{ fontSize: 14, color: 'var(--color-text)', lineHeight: 1.5 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 12 }}>
         <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: '0.06em', color: 'var(--color-text-3)' }}>INVOICE</div>
-        <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--color-primary)', letterSpacing: '-0.02em' }}>FreelanceOS</div>
+        <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--color-primary)', letterSpacing: '-0.02em' }}>Scout</div>
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
@@ -392,7 +392,7 @@ export default function InvoiceDraft() {
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 18 }}>
               <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: '0.06em', color: 'var(--color-text-3)' }}>INVOICE</div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--color-primary)', letterSpacing: '-0.02em' }}>FreelanceOS</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--color-primary)', letterSpacing: '-0.02em' }}>Scout</div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 18 }}>

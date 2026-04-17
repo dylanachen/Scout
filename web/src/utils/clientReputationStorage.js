@@ -1,8 +1,8 @@
 /** Local client reputation (demo / until API exists). Not shown to clients. */
 
-const RATINGS_KEY = 'fos_client_ratings_v1';
-const COMPLETED_KEY = 'fos_client_completed_projects_v1';
-const COUNTED_PROJECTS_KEY = 'fos_client_completed_counted_projects_v1';
+const RATINGS_KEY = 'scout_client_ratings_v1';
+const COMPLETED_KEY = 'scout_client_completed_projects_v1';
+const COUNTED_PROJECTS_KEY = 'scout_client_completed_counted_projects_v1';
 
 function safeParse(raw, fallback) {
   try {
@@ -105,7 +105,7 @@ export function recordClientProjectCompleted(projectId, clientKey) {
   map[key] = (Number(map[key]) || 0) + 1;
   saveCompletedMap(map);
   try {
-    window.dispatchEvent(new CustomEvent('fos-reputation-updated'));
+    window.dispatchEvent(new CustomEvent('scout-reputation-updated'));
   } catch {
     /* ignore */
   }
@@ -133,7 +133,7 @@ export function submitClientRating({
   const prev = loadRatings().filter((r) => String(r.projectId) !== row.projectId);
   saveRatings([...prev, row]);
   try {
-    window.dispatchEvent(new CustomEvent('fos-reputation-updated'));
+    window.dispatchEvent(new CustomEvent('scout-reputation-updated'));
   } catch {
     /* ignore */
   }

@@ -118,12 +118,12 @@ export default function SignUpScreen({ onAuthed }: Props) {
     setFormError('');
     setLoading(true);
     try {
-      const res = await authApi.login('demo@freelanceos.local', 'demo');
+      const res = await authApi.login('demo@scout.local', 'demo');
       const tok = res.data.access_token ?? res.data.token;
       if (!tok) throw new Error('No token');
-      await AsyncStorage.setItem('fos_token', tok);
+      await AsyncStorage.setItem('scout_token', tok);
       const me = await authApi.me();
-      await AsyncStorage.setItem('fos_user_id', String(me.data.id));
+      await AsyncStorage.setItem('scout_user_id', String(me.data.id));
       onAuthed();
     } catch (err) {
       setFormError(formatAuthError(err) ?? 'Could not continue.');
@@ -152,9 +152,9 @@ export default function SignUpScreen({ onAuthed }: Props) {
       const res = await authApi.login(email.trim(), password);
       const tok = res.data.access_token ?? res.data.token;
       if (!tok) throw new Error('No token');
-      await AsyncStorage.setItem('fos_token', tok);
+      await AsyncStorage.setItem('scout_token', tok);
       const me = await authApi.me();
-      await AsyncStorage.setItem('fos_user_id', String(me.data.id));
+      await AsyncStorage.setItem('scout_user_id', String(me.data.id));
       onAuthed();
     } catch (err) {
       setFormError(formatAuthError(err) ?? 'Could not create account.');
@@ -164,9 +164,9 @@ export default function SignUpScreen({ onAuthed }: Props) {
   };
 
   const openTerms = () =>
-    Alert.alert('Terms of Service', 'View the FreelanceOS Terms of Service at freelanceos.com/terms');
+    Alert.alert('Terms of Service', 'View the Scout Terms of Service at scout.com/terms');
   const openPrivacy = () =>
-    Alert.alert('Privacy Policy', 'View the FreelanceOS Privacy Policy at freelanceos.com/privacy');
+    Alert.alert('Privacy Policy', 'View the Scout Privacy Policy at scout.com/privacy');
 
   const strength = getPasswordStrength(password);
 
@@ -176,9 +176,9 @@ export default function SignUpScreen({ onAuthed }: Props) {
         <Animated.View style={[styles.card, { transform: [{ translateX: shakeAnim }] }]}>
           <View style={{ alignItems: 'center', marginBottom: 16 }}>
             <View style={styles.logo}>
-              <Text style={styles.logoText}>FO</Text>
+              <Text style={styles.logoText}>S</Text>
             </View>
-            <Text style={styles.brand}>FreelanceOS</Text>
+            <Text style={styles.brand}>Scout</Text>
           </View>
           {demo ? (
             <View style={styles.demoBox}>

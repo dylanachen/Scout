@@ -1,15 +1,15 @@
 /** One-time modals after a project is marked complete locally. */
 
 export function portfolioPromptKey(projectId) {
-  return `fos_portfolio_prompt_done_${projectId}`;
+  return `scout_portfolio_prompt_done_${projectId}`;
 }
 
 export function testimonialPromptKey(projectId) {
-  return `fos_testimonial_prompt_done_${projectId}`;
+  return `scout_testimonial_prompt_done_${projectId}`;
 }
 
 export function clientRatingPromptKey(projectId) {
-  return `fos_client_rating_prompt_done_${projectId}`;
+  return `scout_client_rating_prompt_done_${projectId}`;
 }
 
 export function isPortfolioPromptDone(projectId) {

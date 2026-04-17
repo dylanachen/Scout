@@ -73,17 +73,17 @@ export default function PublicFreelancerProfile() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-surface-2)', paddingBottom: !isOwn ? 72 : 0 }}>
       <style>{`
-        .fos-portfolio-grid {
+        .scout-portfolio-grid {
           display: grid;
           grid-template-columns: repeat(2, 1fr);
           gap: 16px;
         }
         @media (min-width: 640px) {
-          .fos-portfolio-grid {
+          .scout-portfolio-grid {
             grid-template-columns: repeat(3, 1fr);
           }
         }
-        .fos-testimonials-scroll {
+        .scout-testimonials-scroll {
           display: flex;
           overflow-x: auto;
           gap: 12px;
@@ -91,9 +91,9 @@ export default function PublicFreelancerProfile() {
           -webkit-overflow-scrolling: touch;
           scroll-snap-type: x mandatory;
         }
-        .fos-testimonials-scroll::-webkit-scrollbar { height: 4px; }
-        .fos-testimonials-scroll::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 4px; }
-        .fos-testimonial-card {
+        .scout-testimonials-scroll::-webkit-scrollbar { height: 4px; }
+        .scout-testimonials-scroll::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 4px; }
+        .scout-testimonial-card {
           scroll-snap-align: start;
           min-width: 280px;
           max-width: 340px;
@@ -120,7 +120,7 @@ export default function PublicFreelancerProfile() {
         }}
       >
         <Link to={user ? '/' : '/login'} style={{ fontWeight: 700, fontSize: 14, color: 'var(--color-text)', textDecoration: 'none' }}>
-          &larr; FreelanceOS
+          &larr; Scout
         </Link>
         {isOwn ? (
           <Link
@@ -274,7 +274,7 @@ export default function PublicFreelancerProfile() {
         <section style={{ marginTop: 36 }}>
           <h2 style={{ fontSize: 18, margin: '0 0 14px', letterSpacing: '-0.02em' }}>Portfolio</h2>
           {portfolio.length ? (
-            <div className="fos-portfolio-grid">
+            <div className="scout-portfolio-grid">
               {portfolio.map((item) => (
                 <PortfolioItemCard key={item.id} item={item} onOpen={setDetail} />
               ))}
@@ -314,11 +314,11 @@ export default function PublicFreelancerProfile() {
               <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--color-text-3)' }}>
                 Pulled from completed projects. New reviews may appear after a short moderation step.
               </p>
-              <div className="fos-testimonials-scroll">
+              <div className="scout-testimonials-scroll">
                 {testimonials.map((t) => {
               const initial = (t.clientName || '?').trim().charAt(0).toUpperCase();
               return (
-                <div key={t.id} className="fos-testimonial-card">
+                <div key={t.id} className="scout-testimonial-card">
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
                     <div
                       style={{

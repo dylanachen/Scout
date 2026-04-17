@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
-import { isDemoMode } from '../api/demoAdapter';
 import { api } from '../api/client';
+import useDemoActive from '../hooks/useDemoActive';
 
 /* ── Helpers ───────────────────────────────────────────── */
 
@@ -153,15 +153,22 @@ function MatchPreview({ match }: { match: typeof DEMO_MATCHES[0] }) {
 export default function DashboardScreen() {
   const navigation = useNavigation<any>();
   const { user } = useAuth();
+  const demoActive = useDemoActive();
   const firstName = user?.name?.split(' ')[0] || 'there';
   const [matchesExpanded, setMatchesExpanded] = useState(false);
-  const [projects, setProjects] = useState<typeof DEMO_PROJECTS>(isDemoMode() ? DEMO_PROJECTS : []);
-  const [matches, setMatches] = useState<typeof DEMO_MATCHES>(isDemoMode() ? DEMO_MATCHES : []);
-  const [activity, setActivity] = useState<typeof DEMO_ACTIVITY>(isDemoMode() ? DEMO_ACTIVITY : []);
-  const [metrics, setMetrics] = useState(isDemoMode() ? METRICS : METRICS.map((m) => ({ ...m, value: '—' })));
+  const [projects, setProjects] = useState<typeof DEMO_PROJECTS>([]);
+  const [matches, setMatches] = useState<typeof DEMO_MATCHES>([]);
+  const [activity, setActivity] = useState<typeof DEMO_ACTIVITY>([]);
+  const [metrics, setMetrics] = useState(METRICS.map((m) => ({ ...m, value: '—' })));
 
   useEffect(() => {
-    if (isDemoMode()) return;
+    if (demoActive) {
+      setProjects(DEMO_PROJECTS);
+      setMatches(DEMO_MATCHES);
+      setActivity(DEMO_ACTIVITY);
+      setMetrics(METRICS);
+      return;
+    }
     let cancelled = false;
     (async () => {
       try {
@@ -181,7 +188,7 @@ export default function DashboardScreen() {
       } catch { /* backend unavailable */ }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [demoActive]);
 
   const handleMetricPress = (label: string) => {
     switch (label) {

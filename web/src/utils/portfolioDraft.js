@@ -7,7 +7,7 @@ export function buildPortfolioDraftFromMessages(messages, projectName) {
     .map((m) => m.text.trim());
 
   if (!lines.length) {
-    return `Work completed for “${projectName}”: collaboration, iterations, and final delivery through FreelanceOS.`;
+    return `Work completed for “${projectName}”: collaboration, iterations, and final delivery through Scout.`;
   }
 
   const joined = lines.join(' ');

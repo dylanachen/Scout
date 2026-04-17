@@ -9,8 +9,8 @@ import {
   Modal,
   SectionList,
 } from 'react-native';
-import { isDemoMode } from '../api/demoAdapter';
 import { api } from '../api/client';
+import useDemoActive from '../hooks/useDemoActive';
 
 const DEMO_PROJECTS = ['Website Refresh', 'Pitch Deck'];
 
@@ -39,10 +39,11 @@ function formatTime(seconds: number) {
 }
 
 export default function TimeTrackingScreen() {
+  const demoActive = useDemoActive();
   const [elapsed, setElapsed] = useState(0);
   const [running, setRunning] = useState(false);
-  const [projectNames, setProjectNames] = useState<string[]>(isDemoMode() ? DEMO_PROJECTS : []);
-  const [selectedProject, setSelectedProject] = useState(isDemoMode() ? DEMO_PROJECTS[0] : '');
+  const [projectNames, setProjectNames] = useState<string[]>([]);
+  const [selectedProject, setSelectedProject] = useState('');
   const [showProjectPicker, setShowProjectPicker] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -51,17 +52,23 @@ export default function TimeTrackingScreen() {
   const [stopPlanned, setStopPlanned] = useState(true);
 
   const [showManual, setShowManual] = useState(false);
-  const [manualProject, setManualProject] = useState(isDemoMode() ? DEMO_PROJECTS[0] : '');
+  const [manualProject, setManualProject] = useState('');
   const [manualDate, setManualDate] = useState(new Date().toISOString().slice(0, 10));
   const [manualHours, setManualHours] = useState('');
   const [manualDesc, setManualDesc] = useState('');
   const [manualPlanned, setManualPlanned] = useState(true);
   const [showManualPicker, setShowManualPicker] = useState(false);
 
-  const [entries, setEntries] = useState<TimeEntry[]>(isDemoMode() ? DEMO_ENTRIES : []);
+  const [entries, setEntries] = useState<TimeEntry[]>([]);
 
   useEffect(() => {
-    if (isDemoMode()) return;
+    if (demoActive) {
+      setProjectNames(DEMO_PROJECTS);
+      setSelectedProject(DEMO_PROJECTS[0]);
+      setManualProject(DEMO_PROJECTS[0]);
+      setEntries(DEMO_ENTRIES);
+      return;
+    }
     let cancelled = false;
     (async () => {
       try {
@@ -79,7 +86,7 @@ export default function TimeTrackingScreen() {
       } catch { /* backend unavailable */ }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [demoActive]);
 
   useEffect(() => {
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };

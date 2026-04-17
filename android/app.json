@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "FreelanceOS",
-    "slug": "freelanceos-android",
+    "name": "Scout",
+    "slug": "scout-android",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
@@ -14,7 +14,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow FreelanceOS to access your photos to set a profile picture."
+          "photosPermission": "Allow Scout to access your photos to set a profile picture."
         }
       ]
     ]

@@ -65,9 +65,9 @@ export default function LoginScreen({ onAuthed }: Props) {
       const res = await authApi.login(email.trim(), password);
       const tok = res.data.access_token ?? res.data.token;
       if (!tok) throw new Error('No token');
-      await AsyncStorage.setItem('fos_token', tok);
+      await AsyncStorage.setItem('scout_token', tok);
       const me = await authApi.me();
-      await AsyncStorage.setItem('fos_user_id', String(me.data.id));
+      await AsyncStorage.setItem('scout_user_id', String(me.data.id));
       onAuthed();
     } catch (err) {
       await AsyncStorage.removeItem(DEMO_SESSION_KEY);
@@ -85,9 +85,9 @@ export default function LoginScreen({ onAuthed }: Props) {
       const res = await authApi.login(DEMO_FREELANCER_USER, DEMO_CREDENTIALS_PASSWORD);
       const tok = res.data.access_token ?? res.data.token;
       if (!tok) throw new Error('No token');
-      await AsyncStorage.setItem('fos_token', tok);
+      await AsyncStorage.setItem('scout_token', tok);
       const me = await authApi.me();
-      await AsyncStorage.setItem('fos_user_id', String(me.data.id));
+      await AsyncStorage.setItem('scout_user_id', String(me.data.id));
       onAuthed();
     } catch (err) {
       await AsyncStorage.removeItem(DEMO_SESSION_KEY);
@@ -105,9 +105,9 @@ export default function LoginScreen({ onAuthed }: Props) {
       const res = await authApi.login(DEMO_CLIENT_USER, DEMO_CREDENTIALS_PASSWORD);
       const tok = res.data.access_token ?? res.data.token;
       if (!tok) throw new Error('No token');
-      await AsyncStorage.setItem('fos_token', tok);
+      await AsyncStorage.setItem('scout_token', tok);
       const me = await authApi.me();
-      await AsyncStorage.setItem('fos_user_id', String(me.data.id));
+      await AsyncStorage.setItem('scout_user_id', String(me.data.id));
       onAuthed();
     } catch (err) {
       await AsyncStorage.removeItem(DEMO_SESSION_KEY);
@@ -122,9 +122,9 @@ export default function LoginScreen({ onAuthed }: Props) {
       <View style={styles.card}>
         <View style={{ alignItems: 'center', marginBottom: 20 }}>
           <View style={styles.logo}>
-            <Text style={styles.logoText}>FO</Text>
+            <Text style={styles.logoText}>S</Text>
           </View>
-          <Text style={styles.brand}>FreelanceOS</Text>
+          <Text style={styles.brand}>Scout</Text>
         </View>
         <View style={styles.hintBox}>
           <Text style={styles.hintText}>

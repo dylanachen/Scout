@@ -32,7 +32,7 @@ export default function NavSidebar() {
   return (
     <aside className="nav-sidebar">
       <div style={{ padding: '16px 14px 18px', borderBottom: '1px solid var(--color-border)' }}>
-        <div style={{ fontWeight: 800, fontSize: 13, letterSpacing: '-0.02em' }}>FreelanceOS</div>
+        <div style={{ fontWeight: 800, fontSize: 13, letterSpacing: '-0.02em' }}>Scout</div>
       </div>
       <nav style={{ flex: 1, padding: 12, display: 'flex', flexDirection: 'column', gap: 4, overflowY: 'auto' }}>
         <NavLink to="/" end style={linkStyle}>

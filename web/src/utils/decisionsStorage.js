@@ -1,4 +1,4 @@
-const PREFIX = 'fos_decisions_extra_';
+const PREFIX = 'scout_decisions_extra_';
 
 export function getExtraDecisions(projectId) {
   if (projectId == null) return [];

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate, Navigate } from 'react-router-dom';
-import AuthPageLayout, { FreelanceLogo } from '../components/AuthPageLayout';
+import AuthPageLayout, { ScoutLogo } from '../components/AuthPageLayout';
 import PasswordField from '../components/PasswordField';
 import { useAuth } from '../hooks/useAuth';
 import { formatAuthError } from '../utils/authErrors';
@@ -32,7 +32,7 @@ export default function Login() {
   return (
     <AuthPageLayout>
       <div style={{ textAlign: 'center' }}>
-        <FreelanceLogo centered />
+        <ScoutLogo centered />
       </div>
       <h1 style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.3px', marginBottom: 22, marginTop: 0 }}>
         Welcome back
@@ -123,7 +123,7 @@ export default function Login() {
             opacity: loading ? 0.85 : 1,
           }}
         >
-          {loading ? <span className="fos-spinner" aria-hidden /> : 'Log In'}
+          {loading ? <span className="scout-spinner" aria-hidden /> : 'Log In'}
         </button>
       </form>
 

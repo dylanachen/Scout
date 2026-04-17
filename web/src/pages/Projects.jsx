@@ -67,7 +67,7 @@ export default function Projects() {
 
       <Link
         to="/onboarding"
-        className="fos-fab"
+        className="scout-fab"
         aria-label="Start a New Project"
         style={{
           position: 'fixed',

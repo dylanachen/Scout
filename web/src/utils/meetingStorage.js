@@ -1,5 +1,5 @@
-const MEETING_PREFIX = 'fos_meeting_';
-const SUMMARY_PREFIX = 'fos_meeting_summary_';
+const MEETING_PREFIX = 'scout_meeting_';
+const SUMMARY_PREFIX = 'scout_meeting_summary_';
 
 export function getMeetingSession(projectId) {
   if (projectId == null) return null;

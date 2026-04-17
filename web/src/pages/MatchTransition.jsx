@@ -35,7 +35,7 @@ export default function MatchTransition() {
       }}
     >
       <div
-        className="fos-match-logo"
+        className="scout-match-logo"
         style={{
           width: 56,
           height: 56,

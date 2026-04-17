@@ -8,8 +8,8 @@ import {
   Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { isDemoMode } from '../api/demoAdapter';
 import { api } from '../api/client';
+import useDemoActive from '../hooks/useDemoActive';
 
 type MatchData = {
   id: string;
@@ -262,12 +262,16 @@ function MatchCard({
 
 export default function MatchResultsScreen() {
   const navigation = useNavigation<any>();
+  const demoActive = useDemoActive();
   const [sortBy, setSortBy] = useState<SortKey>('bestMatch');
   const [viewerRole] = useState<'freelancer' | 'client'>('freelancer');
-  const [matchData, setMatchData] = useState<MatchData[]>(isDemoMode() ? MOCK_MATCHES : []);
+  const [matchData, setMatchData] = useState<MatchData[]>([]);
 
   useEffect(() => {
-    if (isDemoMode()) return;
+    if (demoActive) {
+      setMatchData(MOCK_MATCHES);
+      return;
+    }
     let cancelled = false;
     (async () => {
       try {
@@ -276,7 +280,7 @@ export default function MatchResultsScreen() {
       } catch { /* backend unavailable */ }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [demoActive]);
 
   const sorted = useMemo(() => {
     const arr = [...matchData];

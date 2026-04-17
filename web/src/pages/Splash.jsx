@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const HAS_VISITED_KEY = 'fos_has_visited';
+const HAS_VISITED_KEY = 'scout_has_visited';
 
 export default function Splash() {
   const navigate = useNavigate();
@@ -12,7 +12,7 @@ export default function Splash() {
 
     const timer = setTimeout(() => {
       const hasVisited = localStorage.getItem(HAS_VISITED_KEY);
-      const hasToken = localStorage.getItem('fos_token');
+      const hasToken = localStorage.getItem('scout_token');
 
       if (hasToken) {
         navigate('/', { replace: true });
@@ -64,10 +64,10 @@ export default function Splash() {
             letterSpacing: '-0.5px',
           }}
         >
-          FO
+          S
         </div>
         <div style={{ fontWeight: 700, fontSize: 22, color: '#fff', letterSpacing: '-0.4px' }}>
-          FreelanceOS
+          Scout
         </div>
       </div>
     </div>

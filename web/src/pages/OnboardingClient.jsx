@@ -11,7 +11,7 @@ export default function OnboardingClient() {
   return (
     <OnboardingChatScreen
       steps={CLIENT_STEPS}
-      storageKey="fos_onboarding_client"
+      storageKey="scout_onboarding_client"
       firstName={firstName}
       showBuildProfileFinale
       buildProfileMessage="Great — I have everything I need. Finding your best freelancer matches now…"

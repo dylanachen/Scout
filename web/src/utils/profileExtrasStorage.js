@@ -2,7 +2,7 @@
 
 import { isDemoMode } from '../api/demoAdapter';
 
-const KEY = (id) => `fos_profile_extras_${id}`;
+const KEY = (id) => `scout_profile_extras_${id}`;
 
 const empty = () => ({
   specialty: null,

@@ -45,7 +45,7 @@ export default function MeetingBotBanner({ phase, onPressActive, onPressEnded, o
   return (
     <div ref={bannerRef} style={{ position: 'relative', width: '100%' }}>
       <style>{`
-        @keyframes fos-pulse-dot {
+        @keyframes scout-pulse-dot {
           0% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.5); }
           70% { box-shadow: 0 0 0 6px rgba(22, 163, 74, 0); }
           100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); }
@@ -87,7 +87,7 @@ export default function MeetingBotBanner({ phase, onPressActive, onPressEnded, o
               background: DOT[phase] ?? DOT.ended,
               flexShrink: 0,
               boxShadow: phase === 'joining' ? '0 0 0 3px rgba(234, 88, 12, 0.25)' : 'none',
-              animation: phase === 'active' ? 'fos-pulse-dot 1.5s ease-in-out infinite' : 'none',
+              animation: phase === 'active' ? 'scout-pulse-dot 1.5s ease-in-out infinite' : 'none',
             }}
             aria-hidden
           />

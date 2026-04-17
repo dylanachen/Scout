@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import AuthPageLayout, { FreelanceLogo } from '../components/AuthPageLayout';
+import AuthPageLayout, { ScoutLogo } from '../components/AuthPageLayout';
 import { useAuth } from '../hooks/useAuth';
 import { formatAuthError } from '../utils/authErrors';
 
@@ -78,7 +78,7 @@ export default function ForgotPassword() {
       </Link>
 
       <div style={{ textAlign: 'center' }}>
-        <FreelanceLogo centered />
+        <ScoutLogo centered />
       </div>
 
       {success ? (
@@ -183,7 +183,7 @@ export default function ForgotPassword() {
                 opacity: loading ? 0.85 : 1,
               }}
             >
-              {loading ? <span className="fos-spinner" aria-hidden /> : 'Send Reset Link'}
+              {loading ? <span className="scout-spinner" aria-hidden /> : 'Send Reset Link'}
             </button>
           </form>
         </>

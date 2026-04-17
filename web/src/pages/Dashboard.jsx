@@ -60,7 +60,7 @@ export default function Dashboard() {
           </Link>
           <Link
             to="/onboarding"
-            className="fos-start-project-btn"
+            className="scout-start-project-btn"
             style={{
               padding: '10px 18px',
               borderRadius: 10,
@@ -314,7 +314,7 @@ export default function Dashboard() {
 
       <Link
         to="/onboarding"
-        className="fos-fab"
+        className="scout-fab"
         aria-label="Start a New Project"
         style={{
           position: 'fixed',

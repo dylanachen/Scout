@@ -4,12 +4,12 @@ export const DEMO_CREDENTIALS_PASSWORD = 'test';
 export const DEMO_FREELANCER_USER = 'freelancer';
 /** Client demo: username `client`, password `test` */
 export const DEMO_CLIENT_USER = 'client';
-export const DEMO_TOKEN = 'freelanceos-demo-token';
-const DEMO_SESSION_KEY = 'fos_demo_session';
+export const DEMO_TOKEN = 'scout-demo-token';
+const DEMO_SESSION_KEY = 'scout_demo_session';
 
 const FREELANCER_PROFILE = {
   id: 1,
-  email: 'freelancer.demo@freelanceos.local',
+  email: 'freelancer.demo@scout.local',
   name: 'Angela Kang',
   role: 'freelancer',
   avatar_url: null,
@@ -17,7 +17,7 @@ const FREELANCER_PROFILE = {
 
 const CLIENT_PROFILE = {
   id: 2,
-  email: 'client.demo@freelanceos.local',
+  email: 'client.demo@scout.local',
   name: 'Jordan Lee',
   role: 'client',
   avatar_url: null,
@@ -109,7 +109,7 @@ function resolveDemo(config) {
   if (method === 'POST' && path === '/auth/forgot-password') {
     const body = parseBody(config);
     const email = String(body.email ?? '').trim().toLowerCase();
-    if (email === 'notfound@freelanceos.local') {
+    if (email === 'notfound@scout.local') {
       return { status: 404, data: { detail: 'No account found for this email.' } };
     }
     return { status: 200, data: { ok: true } };
@@ -327,7 +327,7 @@ export function shouldUseDemoAdapter() {
   if (envDemoModeEnabled()) return true;
   if (typeof localStorage === 'undefined') return false;
   if (localStorage.getItem(DEMO_SESSION_KEY) === '1') return true;
-  if (localStorage.getItem('fos_token') === DEMO_TOKEN) return true;
+  if (localStorage.getItem('scout_token') === DEMO_TOKEN) return true;
   return false;
 }
 

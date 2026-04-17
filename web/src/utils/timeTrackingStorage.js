@@ -1,5 +1,5 @@
-const ENTRIES_KEY = 'fos_time_entries_v1';
-const SESSION_KEY = 'fos_time_session_v1';
+const ENTRIES_KEY = 'scout_time_entries_v1';
+const SESSION_KEY = 'scout_time_session_v1';
 
 function safeParse(json, fallback) {
   try {
