@@ -1,0 +1,40 @@
+# Dependencies (reinstall: npm ci / npm install in web/ and android/)
+node_modules/
+
+# Vite
+web/dist/
+web/.vite/
+
+# Expo / React Native
+android/.expo/
+android/dist/
+android/web-build/
+.expo/
+web-build/
+
+# Metro / packager
+.metro-health-check*
+
+# Native signing & misc (if you eject or add native projects)
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+
+# Secrets — never commit real keys; use .env.example as a template
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+pnpm-debug.*
+
+# OS
+.DS_Store
