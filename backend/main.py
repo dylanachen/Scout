@@ -8,9 +8,10 @@ from contextlib import asynccontextmanager
 import aiofiles
 from fastapi import (
     FastAPI, HTTPException, Depends, WebSocket, WebSocketDisconnect,
-    UploadFile, File, status,
+    UploadFile, File, Form, status,
 )
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, EmailStr
 
 from database import get_conn, init_db
@@ -27,6 +28,18 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    # Best-effort: embed all seed user profiles so /matches works on first launch
+    try:
+        conn = get_conn()
+        ids = [r["id"] for r in conn.execute("SELECT id FROM users").fetchall()]
+        conn.close()
+        for uid in ids:
+            try:
+                _upsert_profile_embedding(uid)
+            except Exception:
+                pass
+    except Exception as e:
+        print(f"[lifespan] seed-embedding skipped: {e}")
     yield
 
 app = FastAPI(title="FreelanceOS API", lifespan=lifespan)
@@ -38,6 +51,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Serve uploaded files (contract PDFs, chat attachments) at /uploads/*
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 # ── Pydantic schemas ─────────────────────────────────────────────────────────
 
@@ -79,6 +95,121 @@ class ParticipantCreate(BaseModel):
     role: Optional[str] = "Stakeholder"
     email: Optional[str] = None
     avatar_color: Optional[str] = "#64748b"
+
+class ProjectCreate(BaseModel):
+    name: str
+    client_name: Optional[str] = None
+    description: Optional[str] = None
+    budget_min: Optional[int] = None     # cents
+    budget_max: Optional[int] = None     # cents
+    required_skills: Optional[list] = None
+    timeline_weeks: Optional[int] = None
+
+class InvitationCreate(BaseModel):
+    invitee_id: int
+    message: Optional[str] = None
+
+class InvitationPatch(BaseModel):
+    status: str  # 'accepted' | 'declined'
+
+class TaskCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+    assignee_id: Optional[int] = None
+    due_date: Optional[str] = None
+    status: Optional[str] = "todo"
+
+class TaskPatch(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    assignee_id: Optional[int] = None
+    due_date: Optional[str] = None
+    status: Optional[str] = None
+
+class TimeEntryCreate(BaseModel):
+    project_id: int
+    date: str                         # YYYY-MM-DD
+    duration_minutes: int
+    description: Optional[str] = None
+    billable: Optional[bool] = True
+
+class TimeEntryPatch(BaseModel):
+    date: Optional[str] = None
+    duration_minutes: Optional[int] = None
+    description: Optional[str] = None
+    billable: Optional[bool] = None
+
+class DecisionCreate(BaseModel):
+    decision: str
+    message_id: Optional[int] = None
+    tag: Optional[str] = "Decision"
+
+class InvoiceGenerate(BaseModel):
+    hourly_rate_cents: Optional[int] = None  # if omitted, use freelancer's profile rate
+    period_start: Optional[str] = None        # YYYY-MM-DD
+    period_end: Optional[str] = None
+
+class InvoiceCreate(BaseModel):
+    project_id: Optional[int] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+    amount_cents: int = 0
+    due_date: Optional[str] = None
+    client_email: Optional[str] = None
+    notes: Optional[str] = None
+    status: Optional[str] = "draft"
+
+class ScopeFlagPatch(BaseModel):
+    status: str  # 'dismissed' | 'resolved' | 'open'
+
+class PortfolioItemCreate(BaseModel):
+    title: str
+    summary: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    tags: Optional[list] = None
+    testimonial: Optional[str] = None
+    client_name: Optional[str] = None
+    project_id: Optional[int] = None
+    is_public: Optional[bool] = True
+
+class RatingCreate(BaseModel):
+    ratee_id: int
+    project_id: Optional[int] = None
+    overall: float
+    asset_delivery: Optional[float] = None
+    communication: Optional[float] = None
+    scope_respect: Optional[float] = None
+    payment_speed: Optional[float] = None
+    comment: Optional[str] = None
+
+class ChangeOrderCreate(BaseModel):
+    project_id: int
+    title: str
+    description: Optional[str] = None
+    amount_cents: int = 0
+    hours: float = 0.0
+    status: Optional[str] = "draft"
+
+class ChangeOrderPatch(BaseModel):
+    status: Optional[str] = None
+    signed_by_client: Optional[bool] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+    amount_cents: Optional[int] = None
+    hours: Optional[float] = None
+
+class UserSettingsPatch(BaseModel):
+    settings: dict
+
+class NotificationCreate(BaseModel):
+    title: str
+    body: Optional[str] = None
+    kind: Optional[str] = "generic"
+    link: Optional[str] = None
+    project_id: Optional[int] = None
+
+class ChatAskRequest(BaseModel):
+    question: str
 
 class UserProfilePatch(BaseModel):
     # freelancer fields
@@ -249,31 +380,109 @@ def delete_account(user_id: int = Depends(get_current_user_id)):
 
 # ── Projects ──────────────────────────────────────────────────────────────────
 
+def _serialize_project(row) -> dict:
+    p = row_to_dict(row)
+    if p is None:
+        return None
+    try:
+        p["required_skills"] = json.loads(p.get("required_skills") or "[]")
+    except Exception:
+        p["required_skills"] = []
+    return p
+
+
 @app.get("/projects")
 def list_projects(user_id: int = Depends(get_current_user_id)):
     conn = get_conn()
-    rows = conn.execute(
-        "SELECT id, name, client_name, status, created_at FROM projects WHERE owner_id = ?",
+    # Owned projects
+    owned = conn.execute(
+        """SELECT id, name, client_name, description, budget_min, budget_max,
+                  required_skills, timeline_weeks, status, created_at, owner_id
+           FROM projects WHERE owner_id = ?""",
+        (user_id,),
+    ).fetchall()
+    # Projects where I'm an accepted participant
+    accepted = conn.execute(
+        """SELECT p.id, p.name, p.client_name, p.description, p.budget_min, p.budget_max,
+                  p.required_skills, p.timeline_weeks, p.status, p.created_at, p.owner_id
+           FROM projects p
+           JOIN project_invitations i ON i.project_id = p.id
+           WHERE i.invitee_id = ? AND i.status = 'accepted'""",
         (user_id,),
     ).fetchall()
     conn.close()
-    return [row_to_dict(r) for r in rows]
+    rows = list(owned) + list(accepted)
+    return [_serialize_project(r) for r in rows]
 
 
 @app.post("/projects", status_code=201)
-def create_project(body: dict, user_id: int = Depends(get_current_user_id)):
-    name = body.get("name", "").strip()
+def create_project(body: ProjectCreate, user_id: int = Depends(get_current_user_id)):
+    name = body.name.strip()
     if not name:
         raise HTTPException(status_code=422, detail="name is required")
     conn = get_conn()
     conn.execute(
-        "INSERT INTO projects (name, client_name, owner_id) VALUES (?, ?, ?)",
-        (name, body.get("client_name"), user_id),
+        """INSERT INTO projects
+           (name, client_name, owner_id, description, budget_min, budget_max,
+            required_skills, timeline_weeks)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+        (
+            name,
+            (body.client_name or "").strip() or None,
+            user_id,
+            body.description,
+            body.budget_min or 0,
+            body.budget_max or 0,
+            json.dumps(body.required_skills or []),
+            body.timeline_weeks,
+        ),
     )
     conn.commit()
     project_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    row = conn.execute(
+        """SELECT id, name, client_name, description, budget_min, budget_max,
+                  required_skills, timeline_weeks, status, created_at, owner_id
+           FROM projects WHERE id = ?""",
+        (project_id,),
+    ).fetchone()
     conn.close()
-    return {"id": project_id, "name": name}
+    return _serialize_project(row)
+
+
+@app.get("/projects/{project_id}")
+def get_project(project_id: int, user_id: int = Depends(get_current_user_id)):
+    """Project detail — accessible to owner or accepted invitees (and pending invitees so they can review)."""
+    conn = get_conn()
+    row = conn.execute(
+        """SELECT id, name, client_name, description, budget_min, budget_max,
+                  required_skills, timeline_weeks, status, created_at, owner_id
+           FROM projects WHERE id = ?""",
+        (project_id,),
+    ).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Project not found")
+    project = _serialize_project(row)
+
+    if project["owner_id"] != user_id:
+        inv = conn.execute(
+            "SELECT status FROM project_invitations WHERE project_id = ? AND invitee_id = ?",
+            (project_id, user_id),
+        ).fetchone()
+        if not inv:
+            conn.close()
+            raise HTTPException(status_code=403, detail="Not authorized for this project")
+        project["my_invitation_status"] = inv["status"]
+
+    # Attach owner info
+    owner = conn.execute(
+        "SELECT id, name, email FROM users WHERE id = ?", (project["owner_id"],)
+    ).fetchone()
+    if owner:
+        o = row_to_dict(owner)
+        project["owner"] = {"id": o["id"], "name": o["name"] or o["email"], "email": o["email"]}
+    conn.close()
+    return project
 
 # ── Participants ──────────────────────────────────────────────────────────────
 
@@ -281,44 +490,84 @@ def create_project(body: dict, user_id: int = Depends(get_current_user_id)):
 def list_participants(project_id: int, user_id: int = Depends(get_current_user_id)):
     conn = get_conn()
     project = conn.execute(
-        "SELECT id, name, client_name, owner_id FROM projects WHERE id = ? AND owner_id = ?",
-        (project_id, user_id),
+        "SELECT id, name, client_name, owner_id FROM projects WHERE id = ?",
+        (project_id,),
     ).fetchone()
     if not project:
         conn.close()
         raise HTTPException(status_code=404, detail="Project not found")
 
-    owner = conn.execute("SELECT id, name, email FROM users WHERE id = ?", (user_id,)).fetchone()
-    owner_name = owner["name"] or owner["email"] if owner else "You"
-    initials = "".join(w[0] for w in owner_name.split()[:2]).upper() or "YO"
+    # Authorized: owner or any invitee (accepted OR pending can see roster)
+    if project["owner_id"] != user_id:
+        ok = conn.execute(
+            "SELECT 1 FROM project_invitations WHERE project_id = ? AND invitee_id = ?",
+            (project_id, user_id),
+        ).fetchone()
+        if not ok:
+            conn.close()
+            raise HTTPException(status_code=403, detail="Not authorized for this project")
+
+    owner_row = conn.execute(
+        "SELECT id, name, email FROM users WHERE id = ?", (project["owner_id"],)
+    ).fetchone()
+    owner_name = owner_row["name"] or owner_row["email"] if owner_row else "Owner"
+    initials = "".join(w[0] for w in owner_name.split()[:2]).upper() or "OW"
 
     result = [
         {
-            "id": f"owner_{user_id}",
+            "id": f"owner_{project['owner_id']}",
+            "user_id": project["owner_id"],
             "name": owner_name,
             "role": "Host",
             "initials": initials,
             "avatarColor": "var(--color-primary)",
             "removable": False,
+            "status": "owner",
         }
     ]
 
+    # Invited users (accepted + pending)
+    inv_rows = conn.execute(
+        """SELECT i.id as inv_id, i.status, i.invitee_id, u.name, u.email
+           FROM project_invitations i
+           JOIN users u ON u.id = i.invitee_id
+           WHERE i.project_id = ? AND i.status IN ('pending','accepted')""",
+        (project_id,),
+    ).fetchall()
+    for r in inv_rows:
+        d = row_to_dict(r)
+        nm = d["name"] or d["email"]
+        result.append({
+            "id": f"inv_{d['inv_id']}",
+            "invitation_id": d["inv_id"],
+            "user_id": d["invitee_id"],
+            "name": nm,
+            "role": "Freelancer" if d["status"] == "accepted" else "Invited",
+            "initials": "".join(w[0] for w in nm.split()[:2]).upper() or "??",
+            "avatarColor": "#64748b",
+            "removable": True,
+            "status": d["status"],  # 'pending' or 'accepted'
+            "email": d["email"],
+        })
+
+    # Ad-hoc stakeholders (non-user participants)
     rows = conn.execute(
         "SELECT id, name, role, email, avatar_color FROM participants WHERE project_id = ?",
         (project_id,),
     ).fetchall()
     conn.close()
-
     for r in rows:
         p = row_to_dict(r)
         name = p["name"]
         result.append({
-            "id": p["id"],
+            "id": f"stk_{p['id']}",
+            "stakeholder_id": p["id"],
             "name": name,
             "role": p["role"],
             "initials": "".join(w[0] for w in name.split()[:2]).upper() or "??",
             "avatarColor": p["avatar_color"],
             "removable": True,
+            "status": "stakeholder",
             "email": p["email"],
         })
 
@@ -352,9 +601,16 @@ def add_participant(
 @app.delete("/projects/{project_id}/participants/{participant_id}")
 def remove_participant(
     project_id: int,
-    participant_id: int,
+    participant_id: str,
     user_id: int = Depends(get_current_user_id),
 ):
+    """
+    Participant IDs have prefixes in GET /participants:
+      inv_<id>  → project_invitation
+      stk_<id>  → participants (ad-hoc stakeholder)
+      owner_<id> → cannot remove
+    Plain int is accepted as legacy ad-hoc stakeholder id.
+    """
     conn = get_conn()
     project = conn.execute(
         "SELECT id FROM projects WHERE id = ? AND owner_id = ?", (project_id, user_id)
@@ -363,13 +619,112 @@ def remove_participant(
         conn.close()
         raise HTTPException(status_code=404, detail="Project not found")
 
-    conn.execute(
-        "DELETE FROM participants WHERE id = ? AND project_id = ?",
-        (participant_id, project_id),
-    )
+    pid = str(participant_id)
+    if pid.startswith("owner_"):
+        conn.close()
+        raise HTTPException(status_code=400, detail="Cannot remove project owner")
+    if pid.startswith("inv_"):
+        try:
+            inv_id = int(pid.split("_", 1)[1])
+        except (ValueError, IndexError):
+            conn.close()
+            raise HTTPException(status_code=422, detail="Invalid invitation id")
+        conn.execute(
+            "DELETE FROM project_invitations WHERE id = ? AND project_id = ?",
+            (inv_id, project_id),
+        )
+    elif pid.startswith("stk_"):
+        try:
+            stk_id = int(pid.split("_", 1)[1])
+        except (ValueError, IndexError):
+            conn.close()
+            raise HTTPException(status_code=422, detail="Invalid stakeholder id")
+        conn.execute(
+            "DELETE FROM participants WHERE id = ? AND project_id = ?",
+            (stk_id, project_id),
+        )
+    else:
+        # Legacy: treat as raw stakeholder id
+        try:
+            stk_id = int(pid)
+        except ValueError:
+            conn.close()
+            raise HTTPException(status_code=422, detail="Invalid participant id")
+        conn.execute(
+            "DELETE FROM participants WHERE id = ? AND project_id = ?",
+            (stk_id, project_id),
+        )
     conn.commit()
     conn.close()
     return {"ok": True}
+
+
+# ── Chat attachments (files shared inside a project chat) ────────────────────
+
+@app.post("/projects/{project_id}/messages/attachment", status_code=201)
+async def upload_chat_attachment(
+    project_id: int,
+    file: UploadFile = File(...),
+    text: Optional[str] = Form(None),
+    user_id: int = Depends(get_current_user_id),
+):
+    conn = get_conn()
+    try:
+        _check_project_access(conn, project_id, user_id)
+    except HTTPException:
+        conn.close(); raise
+
+    user = conn.execute(
+        "SELECT name, email FROM users WHERE id = ?", (user_id,)
+    ).fetchone()
+    sender_name = (user["name"] or user["email"]) if user else "User"
+
+    # Save file under uploads/chat/<project_id>/
+    project_dir = os.path.join(UPLOAD_DIR, "chat", str(project_id))
+    os.makedirs(project_dir, exist_ok=True)
+    safe_name = f"{uuid.uuid4().hex}_{file.filename}"
+    filepath = os.path.join(project_dir, safe_name)
+
+    content = await file.read()
+    async with aiofiles.open(filepath, "wb") as f:
+        await f.write(content)
+
+    size = len(content)
+    public_url = f"/uploads/chat/{project_id}/{safe_name}"
+    body_text = (text or "").strip() or f"📎 Shared {file.filename}"
+
+    conn.execute(
+        """INSERT INTO messages
+           (project_id, sender_id, sender_name, text,
+            attachment_url, attachment_name, attachment_type, attachment_size)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+        (project_id, user_id, sender_name, body_text,
+         public_url, file.filename, file.content_type, size),
+    )
+    conn.commit()
+    mid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    created_at = conn.execute(
+        "SELECT created_at FROM messages WHERE id = ?", (mid,)
+    ).fetchone()[0]
+    conn.close()
+
+    payload = {
+        "id": mid, "text": body_text,
+        "sender_id": user_id, "sender_name": sender_name,
+        "created_at": created_at,
+        "attachment_url": public_url,
+        "attachment_name": file.filename,
+        "attachment_type": file.content_type,
+        "attachment_size": size,
+    }
+
+    # Broadcast to the chat room (same format as a normal WS message)
+    try:
+        await manager.broadcast(str(project_id), {"type": "message", "payload": payload})
+    except Exception as e:
+        print(f"[Attachment] broadcast failed: {e}")
+
+    return payload
 
 
 # ── Meeting ───────────────────────────────────────────────────────────────────
@@ -438,19 +793,42 @@ Respond with valid JSON only."""
             )
             summary = json.loads(resp.choices[0].message.content)
             summary["duration_minutes"] = duration_min
-            return summary
         except Exception as e:
             print(f"[Meeting] LLM error: {e}")
+            summary = None
+    else:
+        summary = None
 
-    # Fallback summary
-    return {
-        "title": f"Meeting — {project['name']}",
-        "duration_minutes": duration_min,
-        "key_points": ["Meeting completed successfully."],
-        "action_items": [],
-        "decisions": [],
-        "next_steps": "Follow up on discussed items.",
-    }
+    if summary is None:
+        # Fallback summary
+        summary = {
+            "title": f"Meeting — {project['name']}",
+            "duration_minutes": duration_min,
+            "key_points": ["Meeting completed successfully."],
+            "action_items": [],
+            "decisions": [],
+            "next_steps": "Follow up on discussed items.",
+        }
+
+    # Persist the summary so the MeetingSummary page can pull it from backend later
+    try:
+        import datetime as _dt
+        started_iso = _dt.datetime.fromtimestamp(started_at / 1000, tz=_dt.timezone.utc).isoformat()
+        ended_iso   = _dt.datetime.fromtimestamp(ended_at / 1000, tz=_dt.timezone.utc).isoformat()
+        c2 = get_conn()
+        c2.execute(
+            """INSERT INTO meeting_summaries
+               (project_id, created_by, title, duration_minutes, started_at, ended_at, payload_json)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (project_id, user_id, summary.get("title"), duration_min,
+             started_iso, ended_iso, json.dumps(summary)),
+        )
+        c2.commit()
+        summary["id"] = c2.execute("SELECT last_insert_rowid()").fetchone()[0]
+        c2.close()
+    except Exception as e:
+        print(f"[Meeting] persist failed: {e}")
+    return summary
 
 
 # ── Contract upload → triggers RAG pipeline ───────────────────────────────────
@@ -497,6 +875,7 @@ async def ingest_contract(project_id: int, filepath: str):
         from chromadb.utils import embedding_functions
 
         chunks = []
+        global_idx = 0  # unique across the entire document
         with pdfplumber.open(filepath) as pdf:
             for page_num, page in enumerate(pdf.pages):
                 text = page.extract_text() or ""
@@ -508,19 +887,29 @@ async def ingest_contract(project_id: int, filepath: str):
                         chunks.append({
                             "text": chunk,
                             "page": page_num + 1,
-                            "chunk_index": i,
+                            "chunk_index": global_idx,
                         })
+                        global_idx += 1
 
         if not chunks:
             return
 
         client = chromadb.PersistentClient(path="./chroma_db")
         ef = embedding_functions.DefaultEmbeddingFunction()
+        collection_name = f"project_{project_id}_contract"
+
+        # Fresh ingestion per upload — drop the stale collection so old chunks don't
+        # fight with new ones and old IDs can't collide.
+        try:
+            client.delete_collection(collection_name)
+        except Exception:
+            pass
+
         collection = client.get_or_create_collection(
-            f"project_{project_id}_contract", embedding_function=ef
+            collection_name, embedding_function=ef
         )
         collection.upsert(
-            ids=[f"p{project_id}_chunk_{c['chunk_index']}" for c in chunks],
+            ids=[f"p{project_id}_c{c['chunk_index']}" for c in chunks],
             documents=[c["text"] for c in chunks],
             metadatas=[{"page": c["page"]} for c in chunks],
         )
@@ -528,17 +917,421 @@ async def ingest_contract(project_id: int, filepath: str):
     except Exception as e:
         print(f"[RAG] Ingestion failed: {e}")
 
+# ── Tasks ─────────────────────────────────────────────────────────────────────
+
+def _check_project_access(conn, project_id: int, user_id: int) -> dict:
+    """Return project row if user is owner or accepted invitee, else raise 403."""
+    proj = conn.execute(
+        "SELECT id, owner_id, name FROM projects WHERE id = ?", (project_id,)
+    ).fetchone()
+    if not proj:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if proj["owner_id"] == user_id:
+        return row_to_dict(proj)
+    inv = conn.execute(
+        "SELECT 1 FROM project_invitations WHERE project_id = ? AND invitee_id = ? AND status = 'accepted'",
+        (project_id, user_id),
+    ).fetchone()
+    if not inv:
+        raise HTTPException(status_code=403, detail="Not authorized for this project")
+    return row_to_dict(proj)
+
+
+@app.get("/projects/{project_id}/tasks")
+def list_tasks(project_id: int, user_id: int = Depends(get_current_user_id)):
+    conn = get_conn()
+    try:
+        _check_project_access(conn, project_id, user_id)
+    except HTTPException:
+        conn.close(); raise
+    rows = conn.execute(
+        """SELECT t.id, t.title, t.description, t.status, t.assignee_id, t.due_date,
+                  t.created_by, t.created_at, t.updated_at,
+                  u.name as assignee_name
+           FROM tasks t
+           LEFT JOIN users u ON u.id = t.assignee_id
+           WHERE t.project_id = ?
+           ORDER BY
+             CASE t.status WHEN 'in_progress' THEN 0 WHEN 'todo' THEN 1 ELSE 2 END,
+             COALESCE(t.due_date, '9999-12-31') ASC""",
+        (project_id,),
+    ).fetchall()
+    conn.close()
+    return [row_to_dict(r) for r in rows]
+
+
+@app.post("/projects/{project_id}/tasks", status_code=201)
+def create_task(
+    project_id: int,
+    body: TaskCreate,
+    user_id: int = Depends(get_current_user_id),
+):
+    conn = get_conn()
+    try:
+        _check_project_access(conn, project_id, user_id)
+    except HTTPException:
+        conn.close(); raise
+    if not body.title.strip():
+        conn.close()
+        raise HTTPException(status_code=422, detail="title is required")
+    status_val = body.status if body.status in ("todo", "in_progress", "done") else "todo"
+    conn.execute(
+        """INSERT INTO tasks (project_id, title, description, status, assignee_id, due_date, created_by)
+           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+        (project_id, body.title.strip(), body.description, status_val,
+         body.assignee_id, body.due_date, user_id),
+    )
+    conn.commit()
+    tid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    row = conn.execute("SELECT * FROM tasks WHERE id = ?", (tid,)).fetchone()
+    conn.close()
+    return row_to_dict(row)
+
+
+@app.patch("/tasks/{task_id}")
+def patch_task(task_id: int, body: TaskPatch, user_id: int = Depends(get_current_user_id)):
+    conn = get_conn()
+    task = conn.execute("SELECT id, project_id FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    if not task:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Task not found")
+    try:
+        _check_project_access(conn, task["project_id"], user_id)
+    except HTTPException:
+        conn.close(); raise
+    updates = {}
+    for field in ("title", "description", "status", "assignee_id", "due_date"):
+        v = getattr(body, field, None)
+        if v is not None:
+            if field == "status" and v not in ("todo", "in_progress", "done"):
+                continue
+            updates[field] = v
+    if updates:
+        set_clause = ", ".join(f"{k} = ?" for k in updates)
+        set_clause += ", updated_at = datetime('now')"
+        conn.execute(
+            f"UPDATE tasks SET {set_clause} WHERE id = ?",
+            (*updates.values(), task_id),
+        )
+        conn.commit()
+    row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    conn.close()
+    return row_to_dict(row)
+
+
+@app.delete("/tasks/{task_id}")
+def delete_task(task_id: int, user_id: int = Depends(get_current_user_id)):
+    conn = get_conn()
+    task = conn.execute("SELECT id, project_id FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    if not task:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Task not found")
+    try:
+        _check_project_access(conn, task["project_id"], user_id)
+    except HTTPException:
+        conn.close(); raise
+    conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
+# ── Time entries ──────────────────────────────────────────────────────────────
+
+@app.get("/time-entries")
+def list_time_entries(
+    project_id: Optional[int] = None,
+    user_id: int = Depends(get_current_user_id),
+):
+    conn = get_conn()
+    if project_id is not None:
+        try:
+            _check_project_access(conn, project_id, user_id)
+        except HTTPException:
+            conn.close(); raise
+        rows = conn.execute(
+            """SELECT t.*, p.name as project_name
+               FROM time_entries t
+               JOIN projects p ON p.id = t.project_id
+               WHERE t.project_id = ? AND t.user_id = ?
+               ORDER BY t.date DESC, t.created_at DESC""",
+            (project_id, user_id),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            """SELECT t.*, p.name as project_name
+               FROM time_entries t
+               JOIN projects p ON p.id = t.project_id
+               WHERE t.user_id = ?
+               ORDER BY t.date DESC, t.created_at DESC""",
+            (user_id,),
+        ).fetchall()
+    conn.close()
+    return [row_to_dict(r) for r in rows]
+
+
+@app.post("/time-entries", status_code=201)
+def create_time_entry(body: TimeEntryCreate, user_id: int = Depends(get_current_user_id)):
+    if body.duration_minutes <= 0:
+        raise HTTPException(status_code=422, detail="duration_minutes must be > 0")
+    conn = get_conn()
+    try:
+        _check_project_access(conn, body.project_id, user_id)
+    except HTTPException:
+        conn.close(); raise
+    conn.execute(
+        """INSERT INTO time_entries
+           (user_id, project_id, date, duration_minutes, description, billable)
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        (user_id, body.project_id, body.date, int(body.duration_minutes),
+         body.description, int(bool(body.billable if body.billable is not None else True))),
+    )
+    conn.commit()
+    eid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    row = conn.execute(
+        """SELECT t.*, p.name as project_name FROM time_entries t
+           JOIN projects p ON p.id = t.project_id WHERE t.id = ?""", (eid,),
+    ).fetchone()
+    conn.close()
+    return row_to_dict(row)
+
+
+@app.patch("/time-entries/{entry_id}")
+def patch_time_entry(entry_id: int, body: TimeEntryPatch, user_id: int = Depends(get_current_user_id)):
+    conn = get_conn()
+    e = conn.execute("SELECT id, user_id FROM time_entries WHERE id = ?", (entry_id,)).fetchone()
+    if not e:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Entry not found")
+    if e["user_id"] != user_id:
+        conn.close()
+        raise HTTPException(status_code=403, detail="Not your entry")
+    updates = {}
+    for field in ("date", "duration_minutes", "description"):
+        v = getattr(body, field, None)
+        if v is not None:
+            updates[field] = v
+    if body.billable is not None:
+        updates["billable"] = int(bool(body.billable))
+    if updates:
+        set_clause = ", ".join(f"{k} = ?" for k in updates)
+        conn.execute(f"UPDATE time_entries SET {set_clause} WHERE id = ?", (*updates.values(), entry_id))
+        conn.commit()
+    row = conn.execute("SELECT * FROM time_entries WHERE id = ?", (entry_id,)).fetchone()
+    conn.close()
+    return row_to_dict(row)
+
+
+@app.delete("/time-entries/{entry_id}")
+def delete_time_entry(entry_id: int, user_id: int = Depends(get_current_user_id)):
+    conn = get_conn()
+    e = conn.execute("SELECT id, user_id FROM time_entries WHERE id = ?", (entry_id,)).fetchone()
+    if not e:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Entry not found")
+    if e["user_id"] != user_id:
+        conn.close()
+        raise HTTPException(status_code=403, detail="Not your entry")
+    conn.execute("DELETE FROM time_entries WHERE id = ?", (entry_id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
+@app.get("/time-entries/week")
+def time_entries_week(user_id: int = Depends(get_current_user_id)):
+    """Sum minutes per day for the trailing 7 days."""
+    conn = get_conn()
+    rows = conn.execute(
+        """SELECT date, SUM(duration_minutes) as total_minutes
+           FROM time_entries
+           WHERE user_id = ? AND date >= date('now', '-7 days')
+           GROUP BY date ORDER BY date DESC""",
+        (user_id,),
+    ).fetchall()
+    total = sum(r["total_minutes"] or 0 for r in rows)
+    conn.close()
+    return {"days": [row_to_dict(r) for r in rows], "total_minutes": total}
+
+
+# ── Decisions (chat agreements logger) ────────────────────────────────────────
+
+@app.get("/projects/{project_id}/decisions")
+def list_decisions(project_id: int, user_id: int = Depends(get_current_user_id)):
+    conn = get_conn()
+    try:
+        _check_project_access(conn, project_id, user_id)
+    except HTTPException:
+        conn.close(); raise
+    rows = conn.execute(
+        """SELECT id, project_id, message_id, decision, logged_at
+           FROM scope_decisions WHERE project_id = ?
+           ORDER BY logged_at DESC""",
+        (project_id,),
+    ).fetchall()
+    conn.close()
+    return [row_to_dict(r) for r in rows]
+
+
+@app.post("/projects/{project_id}/decisions", status_code=201)
+def create_decision(
+    project_id: int,
+    body: DecisionCreate,
+    user_id: int = Depends(get_current_user_id),
+):
+    conn = get_conn()
+    try:
+        _check_project_access(conn, project_id, user_id)
+    except HTTPException:
+        conn.close(); raise
+    if not body.decision.strip():
+        conn.close()
+        raise HTTPException(status_code=422, detail="decision is required")
+    conn.execute(
+        "INSERT INTO scope_decisions (project_id, message_id, decision) VALUES (?, ?, ?)",
+        (project_id, body.message_id, body.decision.strip()),
+    )
+    conn.commit()
+    did = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    row = conn.execute("SELECT * FROM scope_decisions WHERE id = ?", (did,)).fetchone()
+    conn.close()
+    return row_to_dict(row)
+
+
+@app.delete("/decisions/{decision_id}")
+def delete_decision(decision_id: int, user_id: int = Depends(get_current_user_id)):
+    conn = get_conn()
+    row = conn.execute(
+        """SELECT d.id, d.project_id FROM scope_decisions d WHERE d.id = ?""",
+        (decision_id,),
+    ).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Decision not found")
+    try:
+        _check_project_access(conn, row["project_id"], user_id)
+    except HTTPException:
+        conn.close(); raise
+    conn.execute("DELETE FROM scope_decisions WHERE id = ?", (decision_id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
 # ── Invoices ──────────────────────────────────────────────────────────────────
 
 @app.get("/invoices")
 def list_invoices(user_id: int = Depends(get_current_user_id)):
     conn = get_conn()
     rows = conn.execute(
-        "SELECT id, amount, status, project_id, created_at FROM invoices WHERE owner_id = ?",
+        """SELECT i.id, i.amount, i.status, i.project_id, i.created_at,
+                  p.name as project_name, p.client_name
+           FROM invoices i
+           LEFT JOIN projects p ON p.id = i.project_id
+           WHERE i.owner_id = ?
+           ORDER BY i.created_at DESC""",
         (user_id,),
     ).fetchall()
     conn.close()
     return [row_to_dict(r) for r in rows]
+
+
+@app.post("/projects/{project_id}/invoices/generate", status_code=201)
+def generate_invoice(
+    project_id: int,
+    body: InvoiceGenerate,
+    user_id: int = Depends(get_current_user_id),
+):
+    """Generate a draft invoice from un-invoiced billable time entries."""
+    conn = get_conn()
+    project = conn.execute(
+        "SELECT id, name, owner_id FROM projects WHERE id = ?", (project_id,)
+    ).fetchone()
+    if not project:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # Determine which user's time entries to bill
+    # If owner is freelancer → bill their own time
+    # If owner is client → bill the accepted invitee's time (the freelancer they hired)
+    owner_user = conn.execute(
+        "SELECT id, role FROM users WHERE id = ?", (project["owner_id"],)
+    ).fetchone()
+    if user_id != project["owner_id"]:
+        conn.close()
+        raise HTTPException(status_code=403, detail="Only project owner can generate invoices")
+
+    if owner_user["role"] == "freelancer":
+        billable_user_id = project["owner_id"]
+    else:
+        # Client owner: use their accepted freelancer
+        inv_row = conn.execute(
+            """SELECT invitee_id FROM project_invitations
+               WHERE project_id = ? AND status = 'accepted'
+               ORDER BY responded_at DESC LIMIT 1""",
+            (project_id,),
+        ).fetchone()
+        if not inv_row:
+            conn.close()
+            raise HTTPException(status_code=400, detail="No freelancer accepted on this project yet")
+        billable_user_id = inv_row["invitee_id"]
+
+    # Determine hourly rate
+    rate_cents = body.hourly_rate_cents
+    if not rate_cents:
+        prof = _get_profile(conn, billable_user_id)
+        rate_cents = prof.get("hourly_rate") or 0
+    if not rate_cents:
+        conn.close()
+        raise HTTPException(
+            status_code=400,
+            detail="No hourly rate set. Provide hourly_rate_cents or set it in your profile.",
+        )
+
+    # Pull un-invoiced billable time entries within optional period
+    query = """SELECT id, duration_minutes, date, description FROM time_entries
+               WHERE project_id = ? AND user_id = ? AND billable = 1 AND invoiced = 0"""
+    params = [project_id, billable_user_id]
+    if body.period_start:
+        query += " AND date >= ?"; params.append(body.period_start)
+    if body.period_end:
+        query += " AND date <= ?"; params.append(body.period_end)
+
+    entries = conn.execute(query, params).fetchall()
+    if not entries:
+        conn.close()
+        raise HTTPException(status_code=400, detail="No un-invoiced billable time found in this range")
+
+    total_minutes = sum(e["duration_minutes"] for e in entries)
+    total_hours = total_minutes / 60
+    amount_cents = round(total_hours * rate_cents)
+    amount_str = f"${amount_cents / 100:,.2f}"
+
+    inv_id = f"inv_{uuid.uuid4().hex[:10]}"
+    conn.execute(
+        "INSERT INTO invoices (id, project_id, owner_id, amount, status) VALUES (?, ?, ?, ?, ?)",
+        (inv_id, project_id, user_id, amount_str, "draft"),
+    )
+    # Mark entries as invoiced
+    entry_ids = [e["id"] for e in entries]
+    placeholders = ",".join("?" * len(entry_ids))
+    conn.execute(
+        f"UPDATE time_entries SET invoiced = 1 WHERE id IN ({placeholders})",
+        entry_ids,
+    )
+    conn.commit()
+    conn.close()
+    return {
+        "id": inv_id,
+        "amount": amount_str,
+        "amount_cents": amount_cents,
+        "total_minutes": total_minutes,
+        "total_hours": round(total_hours, 2),
+        "rate_cents": rate_cents,
+        "entry_count": len(entries),
+        "status": "draft",
+        "project_id": project_id,
+    }
 
 
 @app.patch("/invoices/{invoice_id}")
@@ -556,15 +1349,658 @@ def patch_invoice(
         raise HTTPException(status_code=404, detail="Invoice not found")
 
     updates = {k: v for k, v in body.model_dump().items() if v is not None}
+    # Mark paid_at automatically when status flips to 'paid'
+    mark_paid_now = updates.get("status") == "paid" and "paid_at" not in updates
     if updates:
         set_clause = ", ".join(f"{k} = ?" for k in updates)
+        params = list(updates.values())
+        if mark_paid_now:
+            set_clause += ", paid_at = datetime('now')"
         conn.execute(
             f"UPDATE invoices SET {set_clause} WHERE id = ?",
-            (*updates.values(), invoice_id),
+            (*params, invoice_id),
         )
         conn.commit()
     conn.close()
     return {"ok": True}
+
+
+@app.post("/invoices", status_code=201)
+def create_invoice(body: InvoiceCreate, user_id: int = Depends(get_current_user_id)):
+    inv_id = f"inv_{uuid.uuid4().hex[:10]}"
+    amount_str = f"${(body.amount_cents or 0) / 100:,.2f}"
+    conn = get_conn()
+    if body.project_id is not None:
+        proj = conn.execute(
+            "SELECT id FROM projects WHERE id = ? AND owner_id = ?",
+            (body.project_id, user_id),
+        ).fetchone()
+        if not proj:
+            conn.close()
+            raise HTTPException(status_code=404, detail="Project not found")
+    conn.execute(
+        """INSERT INTO invoices
+           (id, project_id, owner_id, amount, amount_cents, status,
+            title, description, due_date, client_email, notes, issued_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))""",
+        (inv_id, body.project_id, user_id, amount_str, body.amount_cents or 0,
+         body.status or "draft", body.title, body.description,
+         body.due_date, body.client_email, body.notes),
+    )
+    conn.commit()
+    row = conn.execute(
+        """SELECT i.*, p.name as project_name, p.client_name
+           FROM invoices i LEFT JOIN projects p ON p.id = i.project_id
+           WHERE i.id = ?""", (inv_id,),
+    ).fetchone()
+    conn.close()
+    return row_to_dict(row)
+
+
+@app.delete("/invoices/{invoice_id}")
+def delete_invoice(invoice_id: str, user_id: int = Depends(get_current_user_id)):
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT id FROM invoices WHERE id = ? AND owner_id = ?", (invoice_id, user_id),
+    ).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    conn.execute("DELETE FROM invoices WHERE id = ?", (invoice_id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
+# ── Scope flags (persistent record of AI scope guardian alerts) ──────────────
+
+@app.get("/projects/{project_id}/scope-flags")
+def list_scope_flags(project_id: int, user_id: int = Depends(get_current_user_id)):
+    conn = get_conn()
+    try:
+        _check_project_access(conn, project_id, user_id)
+    except HTTPException:
+        conn.close(); raise
+    rows = conn.execute(
+        """SELECT id, project_id, message_id, severity, message,
+                  suggested_reply, contract_clause, status, created_at
+           FROM scope_flags WHERE project_id = ?
+           ORDER BY created_at DESC""",
+        (project_id,),
+    ).fetchall()
+    conn.close()
+    return [row_to_dict(r) for r in rows]
+
+
+@app.patch("/scope-flags/{flag_id}")
+def patch_scope_flag(flag_id: int, body: ScopeFlagPatch, user_id: int = Depends(get_current_user_id)):
+    conn = get_conn()
+    row = conn.execute("SELECT project_id FROM scope_flags WHERE id = ?", (flag_id,)).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Flag not found")
+    try:
+        _check_project_access(conn, row["project_id"], user_id)
+    except HTTPException:
+        conn.close(); raise
+    if body.status not in ("open", "dismissed", "resolved"):
+        conn.close()
+        raise HTTPException(status_code=422, detail="Invalid status")
+    conn.execute("UPDATE scope_flags SET status = ? WHERE id = ?", (body.status, flag_id))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
+# ── Meetings (persistent summaries) ──────────────────────────────────────────
+
+@app.get("/projects/{project_id}/meetings")
+def list_meetings(project_id: int, user_id: int = Depends(get_current_user_id)):
+    conn = get_conn()
+    try:
+        _check_project_access(conn, project_id, user_id)
+    except HTTPException:
+        conn.close(); raise
+    rows = conn.execute(
+        """SELECT id, title, duration_minutes, started_at, ended_at, created_at
+           FROM meeting_summaries WHERE project_id = ?
+           ORDER BY ended_at DESC""",
+        (project_id,),
+    ).fetchall()
+    conn.close()
+    return [row_to_dict(r) for r in rows]
+
+
+@app.get("/meetings/{meeting_id}")
+def get_meeting(meeting_id: int, user_id: int = Depends(get_current_user_id)):
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT * FROM meeting_summaries WHERE id = ?", (meeting_id,),
+    ).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    try:
+        _check_project_access(conn, row["project_id"], user_id)
+    except HTTPException:
+        conn.close(); raise
+    conn.close()
+    d = row_to_dict(row)
+    try:
+        d["payload"] = json.loads(d.get("payload_json") or "{}")
+    except Exception:
+        d["payload"] = {}
+    d.pop("payload_json", None)
+    return d
+
+
+# ── Portfolio ────────────────────────────────────────────────────────────────
+
+@app.get("/portfolio")
+def my_portfolio(user_id: int = Depends(get_current_user_id)):
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT * FROM portfolio_items WHERE user_id = ? ORDER BY created_at DESC",
+        (user_id,),
+    ).fetchall()
+    conn.close()
+    result = []
+    for r in rows:
+        d = row_to_dict(r)
+        try: d["tags"] = json.loads(d.get("tags") or "[]")
+        except Exception: d["tags"] = []
+        result.append(d)
+    return result
+
+
+@app.get("/users/{target_user_id}/portfolio")
+def user_portfolio(target_user_id: int):
+    """Public portfolio — shows only public items. No auth required."""
+    conn = get_conn()
+    rows = conn.execute(
+        """SELECT * FROM portfolio_items
+           WHERE user_id = ? AND is_public = 1
+           ORDER BY created_at DESC""",
+        (target_user_id,),
+    ).fetchall()
+    conn.close()
+    result = []
+    for r in rows:
+        d = row_to_dict(r)
+        try: d["tags"] = json.loads(d.get("tags") or "[]")
+        except Exception: d["tags"] = []
+        result.append(d)
+    return result
+
+
+@app.post("/portfolio", status_code=201)
+def create_portfolio_item(body: PortfolioItemCreate, user_id: int = Depends(get_current_user_id)):
+    if not body.title.strip():
+        raise HTTPException(status_code=422, detail="title required")
+    conn = get_conn()
+    conn.execute(
+        """INSERT INTO portfolio_items
+           (user_id, project_id, title, summary, thumbnail_url, tags,
+            testimonial, client_name, is_public)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (user_id, body.project_id, body.title.strip(), body.summary,
+         body.thumbnail_url, json.dumps(body.tags or []),
+         body.testimonial, body.client_name,
+         int(bool(body.is_public if body.is_public is not None else True))),
+    )
+    conn.commit()
+    pid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    row = conn.execute("SELECT * FROM portfolio_items WHERE id = ?", (pid,)).fetchone()
+    conn.close()
+    d = row_to_dict(row)
+    try: d["tags"] = json.loads(d.get("tags") or "[]")
+    except Exception: d["tags"] = []
+    return d
+
+
+@app.delete("/portfolio/{item_id}")
+def delete_portfolio_item(item_id: int, user_id: int = Depends(get_current_user_id)):
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT user_id FROM portfolio_items WHERE id = ?", (item_id,),
+    ).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Item not found")
+    if row["user_id"] != user_id:
+        conn.close()
+        raise HTTPException(status_code=403, detail="Not your item")
+    conn.execute("DELETE FROM portfolio_items WHERE id = ?", (item_id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
+# ── Ratings / Reputation ─────────────────────────────────────────────────────
+
+def _aggregate_ratings(conn, uid: int) -> dict:
+    row = conn.execute(
+        """SELECT COUNT(*) as cnt,
+                  AVG(overall) as overall,
+                  AVG(asset_delivery) as asset_delivery,
+                  AVG(communication) as communication,
+                  AVG(scope_respect) as scope_respect,
+                  AVG(payment_speed) as payment_speed
+           FROM ratings WHERE ratee_id = ?""",
+        (uid,),
+    ).fetchone()
+    if not row or not row["cnt"]:
+        return {"count": 0, "overall": None, "asset_delivery": None,
+                "communication": None, "scope_respect": None, "payment_speed": None}
+    return {
+        "count": row["cnt"],
+        "overall": round(row["overall"], 2) if row["overall"] is not None else None,
+        "asset_delivery": round(row["asset_delivery"], 2) if row["asset_delivery"] is not None else None,
+        "communication": round(row["communication"], 2) if row["communication"] is not None else None,
+        "scope_respect": round(row["scope_respect"], 2) if row["scope_respect"] is not None else None,
+        "payment_speed": round(row["payment_speed"], 2) if row["payment_speed"] is not None else None,
+    }
+
+
+@app.post("/ratings", status_code=201)
+def create_rating(body: RatingCreate, user_id: int = Depends(get_current_user_id)):
+    if not (1.0 <= body.overall <= 5.0):
+        raise HTTPException(status_code=422, detail="overall must be 1.0–5.0")
+    if body.ratee_id == user_id:
+        raise HTTPException(status_code=400, detail="Cannot rate yourself")
+    conn = get_conn()
+    ratee = conn.execute("SELECT id FROM users WHERE id = ?", (body.ratee_id,)).fetchone()
+    if not ratee:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Ratee not found")
+    conn.execute(
+        """INSERT INTO ratings
+           (rater_id, ratee_id, project_id, overall, asset_delivery,
+            communication, scope_respect, payment_speed, comment)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (user_id, body.ratee_id, body.project_id, body.overall,
+         body.asset_delivery, body.communication, body.scope_respect,
+         body.payment_speed, body.comment),
+    )
+    conn.commit()
+    rid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    conn.close()
+    return {"id": rid, "ok": True}
+
+
+@app.get("/users/{target_user_id}/reputation")
+def user_reputation(target_user_id: int):
+    conn = get_conn()
+    agg = _aggregate_ratings(conn, target_user_id)
+    conn.close()
+    return agg
+
+
+# ── Change orders ────────────────────────────────────────────────────────────
+
+@app.get("/projects/{project_id}/change-orders")
+def list_change_orders(project_id: int, user_id: int = Depends(get_current_user_id)):
+    conn = get_conn()
+    try:
+        _check_project_access(conn, project_id, user_id)
+    except HTTPException:
+        conn.close(); raise
+    rows = conn.execute(
+        "SELECT * FROM change_orders WHERE project_id = ? ORDER BY created_at DESC",
+        (project_id,),
+    ).fetchall()
+    conn.close()
+    return [row_to_dict(r) for r in rows]
+
+
+@app.post("/projects/{project_id}/change-orders", status_code=201)
+def create_change_order(
+    project_id: int,
+    body: ChangeOrderCreate,
+    user_id: int = Depends(get_current_user_id),
+):
+    conn = get_conn()
+    try:
+        _check_project_access(conn, project_id, user_id)
+    except HTTPException:
+        conn.close(); raise
+    if not body.title.strip():
+        conn.close()
+        raise HTTPException(status_code=422, detail="title required")
+    conn.execute(
+        """INSERT INTO change_orders
+           (project_id, created_by, title, description, amount_cents, hours, status)
+           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+        (project_id, user_id, body.title.strip(), body.description,
+         body.amount_cents or 0, body.hours or 0.0,
+         body.status if body.status in ("draft","sent","accepted","declined") else "draft"),
+    )
+    conn.commit()
+    co_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    row = conn.execute("SELECT * FROM change_orders WHERE id = ?", (co_id,)).fetchone()
+    conn.close()
+    return row_to_dict(row)
+
+
+@app.patch("/change-orders/{order_id}")
+def patch_change_order(
+    order_id: int,
+    body: ChangeOrderPatch,
+    user_id: int = Depends(get_current_user_id),
+):
+    conn = get_conn()
+    row = conn.execute("SELECT project_id FROM change_orders WHERE id = ?", (order_id,)).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Change order not found")
+    try:
+        _check_project_access(conn, row["project_id"], user_id)
+    except HTTPException:
+        conn.close(); raise
+    updates = {}
+    for field in ("status", "title", "description", "amount_cents", "hours"):
+        v = getattr(body, field, None)
+        if v is not None:
+            if field == "status" and v not in ("draft","sent","accepted","declined"):
+                continue
+            updates[field] = v
+    if body.signed_by_client is not None:
+        updates["signed_by_client"] = int(bool(body.signed_by_client))
+    if updates:
+        set_clause = ", ".join(f"{k} = ?" for k in updates)
+        set_clause += ", updated_at = datetime('now')"
+        conn.execute(
+            f"UPDATE change_orders SET {set_clause} WHERE id = ?",
+            (*updates.values(), order_id),
+        )
+        conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
+# ── User settings (rates, notifications, scope guardian, communication) ─────
+
+@app.get("/settings")
+def get_user_settings(user_id: int = Depends(get_current_user_id)):
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT settings_json FROM user_settings WHERE user_id = ?", (user_id,),
+    ).fetchone()
+    conn.close()
+    if not row:
+        return {}
+    try:
+        return json.loads(row["settings_json"] or "{}")
+    except Exception:
+        return {}
+
+
+@app.patch("/settings")
+def patch_user_settings(body: UserSettingsPatch, user_id: int = Depends(get_current_user_id)):
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT settings_json FROM user_settings WHERE user_id = ?", (user_id,),
+    ).fetchone()
+    existing = {}
+    if row:
+        try: existing = json.loads(row["settings_json"] or "{}")
+        except Exception: existing = {}
+    merged = {**existing, **(body.settings or {})}
+    merged_json = json.dumps(merged)
+    if row:
+        conn.execute(
+            "UPDATE user_settings SET settings_json = ?, updated_at = datetime('now') WHERE user_id = ?",
+            (merged_json, user_id),
+        )
+    else:
+        conn.execute(
+            "INSERT INTO user_settings (user_id, settings_json) VALUES (?, ?)",
+            (user_id, merged_json),
+        )
+    conn.commit()
+    conn.close()
+    return merged
+
+
+# ── Notifications (backend-driven feed + read state) ─────────────────────────
+
+@app.get("/notifications")
+def list_notifications(user_id: int = Depends(get_current_user_id)):
+    conn = get_conn()
+    rows = conn.execute(
+        """SELECT id, kind, title, body, link, project_id, read_at, created_at
+           FROM notifications WHERE user_id = ?
+           ORDER BY created_at DESC LIMIT 100""",
+        (user_id,),
+    ).fetchall()
+    conn.close()
+    return [row_to_dict(r) for r in rows]
+
+
+@app.post("/notifications/{notification_id}/read")
+def mark_notification_read(notification_id: int, user_id: int = Depends(get_current_user_id)):
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT user_id FROM notifications WHERE id = ?", (notification_id,),
+    ).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Notification not found")
+    if row["user_id"] != user_id:
+        conn.close()
+        raise HTTPException(status_code=403, detail="Not yours")
+    conn.execute(
+        "UPDATE notifications SET read_at = datetime('now') WHERE id = ?",
+        (notification_id,),
+    )
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
+@app.post("/notifications/read-all")
+def mark_all_notifications_read(user_id: int = Depends(get_current_user_id)):
+    conn = get_conn()
+    conn.execute(
+        """UPDATE notifications SET read_at = datetime('now')
+           WHERE user_id = ? AND read_at IS NULL""",
+        (user_id,),
+    )
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
+# ── Chat AI (Summary + Ask) ──────────────────────────────────────────────────
+
+def _fetch_chat_transcript(conn, project_id: int, limit: int = 80) -> list[dict]:
+    rows = conn.execute(
+        """SELECT id, sender_name, text, created_at, attachment_name
+           FROM messages
+           WHERE project_id = ?
+           ORDER BY created_at DESC LIMIT ?""",
+        (project_id, limit),
+    ).fetchall()
+    return [row_to_dict(r) for r in reversed(rows)]
+
+
+def _render_transcript(messages: list[dict]) -> str:
+    lines = []
+    for m in messages:
+        when = (m.get("created_at") or "")[:16]
+        sender = m.get("sender_name") or "User"
+        text = (m.get("text") or "").strip()
+        attach = m.get("attachment_name")
+        if attach:
+            text = f"{text} [attached: {attach}]" if text else f"[attached: {attach}]"
+        if text:
+            lines.append(f"{when}  {sender}: {text}")
+    return "\n".join(lines)
+
+
+@app.post("/projects/{project_id}/chat/summary")
+async def chat_summary(project_id: int, user_id: int = Depends(get_current_user_id)):
+    """LLM-generated summary of the current chat transcript."""
+    conn = get_conn()
+    try:
+        project = _check_project_access(conn, project_id, user_id)
+    except HTTPException:
+        conn.close(); raise
+    messages = _fetch_chat_transcript(conn, project_id, limit=80)
+    conn.close()
+
+    if not messages:
+        return {
+            "summary": "No messages to summarize yet.",
+            "key_points": [], "decisions": [], "action_items": [],
+            "open_questions": [], "message_count": 0,
+        }
+
+    transcript = _render_transcript(messages)
+    openai_key = os.environ.get("OPENAI_API_KEY")
+
+    if openai_key:
+        try:
+            from openai import AsyncOpenAI
+            oai = AsyncOpenAI(api_key=openai_key)
+            prompt = f"""You are summarizing a freelancer-client project chat.
+
+Project: {project.get('name') or 'Untitled'}
+
+Transcript (most recent last):
+{transcript}
+
+Return valid JSON with these fields:
+- summary: 2-3 sentence TL;DR of what was discussed
+- key_points: array of short bullet strings (max 6)
+- decisions: array of explicit agreements or decisions made
+- action_items: array of objects {{"text": string, "owner": string}}
+- open_questions: array of unresolved questions or pending clarifications
+
+Respond with JSON only."""
+            resp = await oai.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=700,
+                response_format={"type": "json_object"},
+            )
+            data = json.loads(resp.choices[0].message.content)
+            data["message_count"] = len(messages)
+            return data
+        except Exception as e:
+            print(f"[ChatSummary] LLM error: {e}")
+
+    # Fallback — simple heuristic summary (first + last message + counts)
+    first = messages[0]
+    last = messages[-1]
+    participants = sorted({m.get("sender_name") for m in messages if m.get("sender_name")})
+    return {
+        "summary": (
+            f"{len(messages)} messages between {', '.join(participants)}. "
+            f"Conversation started with \"{(first.get('text') or '')[:120]}\" "
+            f"and most recent message was \"{(last.get('text') or '')[:120]}\". "
+            "(Set OPENAI_API_KEY for an AI-powered summary.)"
+        ),
+        "key_points": [],
+        "decisions": [],
+        "action_items": [],
+        "open_questions": [],
+        "message_count": len(messages),
+        "participants": participants,
+    }
+
+
+@app.post("/projects/{project_id}/chat/ask")
+async def chat_ask(
+    project_id: int,
+    body: ChatAskRequest,
+    user_id: int = Depends(get_current_user_id),
+):
+    """Answer a user question using the chat history + (optional) contract RAG as context."""
+    question = (body.question or "").strip()
+    if not question:
+        raise HTTPException(status_code=422, detail="question is required")
+
+    conn = get_conn()
+    try:
+        project = _check_project_access(conn, project_id, user_id)
+    except HTTPException:
+        conn.close(); raise
+    messages = _fetch_chat_transcript(conn, project_id, limit=120)
+    conn.close()
+
+    transcript = _render_transcript(messages)
+
+    # Best-effort RAG: pull the 3 most relevant contract clauses if a contract was uploaded.
+    contract_context = ""
+    try:
+        import chromadb
+        from chromadb.utils import embedding_functions
+        cclient = chromadb.PersistentClient(path="./chroma_db")
+        ef = embedding_functions.DefaultEmbeddingFunction()
+        try:
+            col = cclient.get_collection(f"project_{project_id}_contract", embedding_function=ef)
+            results = col.query(query_texts=[question], n_results=3)
+            docs = (results.get("documents") or [[]])[0]
+            if docs:
+                contract_context = "\n---\n".join(docs)
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+    openai_key = os.environ.get("OPENAI_API_KEY")
+    if openai_key:
+        try:
+            from openai import AsyncOpenAI
+            oai = AsyncOpenAI(api_key=openai_key)
+            system = """You are an AI assistant helping answer questions about a specific project chat
+between a freelancer and a client. Base your answer ONLY on the transcript and the (optional)
+contract clauses provided. If the answer isn't in the context, say you couldn't find it.
+Be concise — 1-3 sentences unless the user asks for detail."""
+            contract_block = (
+                f"Relevant contract clauses:\n{contract_context}\n\n"
+                if contract_context else ""
+            )
+            user_prompt = (
+                f"Project: {project.get('name') or 'Untitled'}\n\n"
+                f"Chat transcript:\n{transcript or '(no messages)'}\n\n"
+                f"{contract_block}"
+                f"Question: {question}"
+            )
+            resp = await oai.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user_prompt},
+                ],
+                max_tokens=500,
+            )
+            answer = resp.choices[0].message.content
+            return {
+                "answer": answer,
+                "used_messages": len(messages),
+                "used_contract": bool(contract_context),
+            }
+        except Exception as e:
+            print(f"[ChatAsk] LLM error: {e}")
+
+    # Fallback — simple substring search
+    q_lower = question.lower()
+    hits = [m for m in messages if q_lower in (m.get("text") or "").lower()][:3]
+    if hits:
+        snippet = " / ".join((h.get("text") or "")[:120] for h in hits)
+        answer = (
+            f"(No OPENAI_API_KEY set — keyword match mode) Found {len(hits)} related "
+            f"message(s): {snippet}"
+        )
+    else:
+        answer = (
+            "(No OPENAI_API_KEY set) Couldn't find anything matching that in the chat. "
+            "Set OPENAI_API_KEY for real AI answers."
+        )
+    return {"answer": answer, "used_messages": len(messages), "used_contract": False}
+
 
 # ── User profile ─────────────────────────────────────────────────────────────
 
@@ -596,6 +2032,112 @@ def get_profile(user_id: int = Depends(get_current_user_id)):
     profile = _get_profile(conn, user_id)
     conn.close()
     return {**user, **profile}
+
+
+def _profile_to_embedding_text(user_row: dict, profile: dict) -> str:
+    """Compose a single text blob describing a user for embedding."""
+    parts = []
+    role = user_row.get("role") or "user"
+    parts.append(f"Role: {role}.")
+    name = user_row.get("name") or user_row.get("email") or ""
+    if name: parts.append(f"Name: {name}.")
+    if profile.get("specialty"): parts.append(f"Specialty: {profile['specialty']}.")
+    if profile.get("bio"): parts.append(f"Bio: {profile['bio']}")
+    if profile.get("location"): parts.append(f"Location: {profile['location']}.")
+    skills = profile.get("skills") or []
+    if skills: parts.append(f"Skills: {', '.join(skills)}.")
+    req = profile.get("required_skills") or []
+    if req: parts.append(f"Looking for skills: {', '.join(req)}.")
+    if profile.get("project_title"): parts.append(f"Project: {profile['project_title']}.")
+    if profile.get("project_summary"): parts.append(f"Project description: {profile['project_summary']}")
+    if profile.get("hourly_rate"):
+        parts.append(f"Hourly rate: ${profile['hourly_rate']/100:.0f}/hr.")
+    if profile.get("budget_min") or profile.get("budget_max"):
+        parts.append(
+            f"Budget: ${(profile.get('budget_min') or 0)/100:.0f}–${(profile.get('budget_max') or 0)/100:.0f}."
+        )
+    return " ".join(parts)
+
+
+def _upsert_profile_embedding(user_id: int):
+    """Push user profile text into ChromaDB collection 'user_profiles'."""
+    try:
+        import chromadb
+        from chromadb.utils import embedding_functions
+
+        conn = get_conn()
+        u = conn.execute("SELECT id, name, email, role FROM users WHERE id = ?", (user_id,)).fetchone()
+        if not u:
+            conn.close()
+            return
+        profile = _get_profile(conn, user_id)
+        conn.close()
+
+        text = _profile_to_embedding_text(row_to_dict(u), profile)
+        if not text.strip():
+            return
+
+        client = chromadb.PersistentClient(path="./chroma_db")
+        ef = embedding_functions.DefaultEmbeddingFunction()
+        col = client.get_or_create_collection("user_profiles", embedding_function=ef)
+        col.upsert(
+            ids=[f"user_{user_id}"],
+            documents=[text],
+            metadatas=[{"user_id": user_id, "role": u["role"] or "freelancer"}],
+        )
+    except Exception as e:
+        print(f"[Embeddings] upsert failed for user {user_id}: {e}")
+
+
+def _embedding_match_scores(user_id: int, target_role: str) -> dict:
+    """Return {target_user_id: similarity_0_to_100} for users of `target_role`."""
+    try:
+        import chromadb
+        from chromadb.utils import embedding_functions
+
+        client = chromadb.PersistentClient(path="./chroma_db")
+        ef = embedding_functions.DefaultEmbeddingFunction()
+        col = client.get_or_create_collection("user_profiles", embedding_function=ef)
+
+        # Make sure my own profile is in the collection
+        _upsert_profile_embedding(user_id)
+
+        my = col.get(ids=[f"user_{user_id}"], include=["embeddings"])
+        my_embs = my.get("embeddings")
+        if my_embs is None or len(my_embs) == 0:
+            return {}
+        my_emb = my_embs[0]
+        # Convert numpy → list if needed
+        try:
+            my_emb = my_emb.tolist()
+        except AttributeError:
+            pass
+
+        results = col.query(
+            query_embeddings=[my_emb],
+            where={"role": target_role},
+            n_results=50,
+        )
+        scores = {}
+        ids = results.get("ids", [[]])[0]
+        dists = results.get("distances", [[]])[0]
+        for i, raw_id in enumerate(ids):
+            if not raw_id.startswith("user_"):
+                continue
+            try:
+                uid = int(raw_id.split("_", 1)[1])
+            except ValueError:
+                continue
+            if uid == user_id:
+                continue
+            d = dists[i] if i < len(dists) else 1.0
+            # Cosine distance ~ [0, 2]; closer is better. Convert to 0-100.
+            sim = max(0.0, 1.0 - (d / 2.0))
+            scores[uid] = round(sim * 100)
+        return scores
+    except Exception as e:
+        print(f"[Embeddings] match query failed: {e}")
+        return {}
 
 
 @app.patch("/profile")
@@ -634,6 +2176,13 @@ def update_profile(body: UserProfilePatch, user_id: int = Depends(get_current_us
     conn.commit()
     profile = _get_profile(conn, user_id)
     conn.close()
+
+    # Push updated profile into vector DB (best-effort; never blocks)
+    try:
+        _upsert_profile_embedding(user_id)
+    except Exception as e:
+        print(f"[Embeddings] could not embed profile {user_id}: {e}")
+
     return profile
 
 
@@ -744,6 +2293,255 @@ def _build_explanation(f: dict, c: dict, scores: dict) -> str:
     return " ".join(parts)
 
 
+# ── Interests ─────────────────────────────────────────────────────────────────
+
+def _user_snapshot(conn, uid: int) -> dict:
+    """Return a public-profile snapshot for a user (used in interests/invitations responses)."""
+    u = conn.execute(
+        "SELECT id, name, email, role FROM users WHERE id = ?", (uid,)
+    ).fetchone()
+    if not u:
+        return None
+    profile = _get_profile(conn, uid)
+    return {
+        "id": u["id"],
+        "name": u["name"] or u["email"],
+        "email": u["email"],
+        "role": u["role"],
+        "skills": profile.get("skills") or [],
+        "hourly_rate": profile.get("hourly_rate") or 0,
+        "available": bool(profile.get("available", 1)),
+        "available_from": profile.get("available_from"),
+        "bio": profile.get("bio"),
+        "specialty": profile.get("specialty"),
+        "location": profile.get("location"),
+        "project_title": profile.get("project_title"),
+        "project_summary": profile.get("project_summary"),
+        "budget_min": profile.get("budget_min") or 0,
+        "budget_max": profile.get("budget_max") or 0,
+    }
+
+
+@app.get("/interests")
+def list_interests(user_id: int = Depends(get_current_user_id)):
+    conn = get_conn()
+    rows = conn.execute(
+        """SELECT target_user_id, created_at FROM user_interests
+           WHERE user_id = ? ORDER BY created_at DESC""",
+        (user_id,),
+    ).fetchall()
+    result = []
+    for r in rows:
+        snap = _user_snapshot(conn, r["target_user_id"])
+        if snap:
+            snap["interested_at"] = r["created_at"]
+            result.append(snap)
+    conn.close()
+    return result
+
+
+@app.post("/interests/{target_user_id}", status_code=201)
+def add_interest(target_user_id: int, user_id: int = Depends(get_current_user_id)):
+    if target_user_id == user_id:
+        raise HTTPException(status_code=400, detail="Cannot add yourself")
+    conn = get_conn()
+    exists = conn.execute(
+        "SELECT 1 FROM users WHERE id = ?", (target_user_id,)
+    ).fetchone()
+    if not exists:
+        conn.close()
+        raise HTTPException(status_code=404, detail="User not found")
+    conn.execute(
+        """INSERT OR IGNORE INTO user_interests (user_id, target_user_id)
+           VALUES (?, ?)""",
+        (user_id, target_user_id),
+    )
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
+@app.delete("/interests/{target_user_id}")
+def remove_interest(target_user_id: int, user_id: int = Depends(get_current_user_id)):
+    conn = get_conn()
+    conn.execute(
+        "DELETE FROM user_interests WHERE user_id = ? AND target_user_id = ?",
+        (user_id, target_user_id),
+    )
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
+# ── Project Invitations ───────────────────────────────────────────────────────
+
+@app.post("/projects/{project_id}/invitations", status_code=201)
+def create_invitation(
+    project_id: int,
+    body: InvitationCreate,
+    user_id: int = Depends(get_current_user_id),
+):
+    conn = get_conn()
+    project = conn.execute(
+        "SELECT id, name, owner_id FROM projects WHERE id = ? AND owner_id = ?",
+        (project_id, user_id),
+    ).fetchone()
+    if not project:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    if body.invitee_id == user_id:
+        conn.close()
+        raise HTTPException(status_code=400, detail="Cannot invite yourself")
+
+    invitee = conn.execute(
+        "SELECT id, name, email FROM users WHERE id = ?", (body.invitee_id,)
+    ).fetchone()
+    if not invitee:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Invitee not found")
+
+    # Check existing invitation
+    existing = conn.execute(
+        "SELECT id, status FROM project_invitations WHERE project_id = ? AND invitee_id = ?",
+        (project_id, body.invitee_id),
+    ).fetchone()
+    if existing:
+        conn.close()
+        raise HTTPException(
+            status_code=409,
+            detail=f"Invitation already exists (status: {existing['status']})",
+        )
+
+    conn.execute(
+        """INSERT INTO project_invitations (project_id, inviter_id, invitee_id, message)
+           VALUES (?, ?, ?, ?)""",
+        (project_id, user_id, body.invitee_id, body.message),
+    )
+    conn.commit()
+    inv_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    conn.close()
+    return {
+        "id": inv_id,
+        "project_id": project_id,
+        "invitee_id": body.invitee_id,
+        "status": "pending",
+        "invitee_name": invitee["name"] or invitee["email"],
+    }
+
+
+@app.get("/projects/{project_id}/invitations")
+def list_project_invitations(
+    project_id: int,
+    user_id: int = Depends(get_current_user_id),
+):
+    conn = get_conn()
+    project = conn.execute(
+        "SELECT id, owner_id FROM projects WHERE id = ?", (project_id,)
+    ).fetchone()
+    if not project or project["owner_id"] != user_id:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    rows = conn.execute(
+        """SELECT i.id, i.status, i.message, i.created_at, i.responded_at,
+                  u.id as invitee_id, u.name as invitee_name, u.email as invitee_email
+           FROM project_invitations i
+           JOIN users u ON u.id = i.invitee_id
+           WHERE i.project_id = ?
+           ORDER BY i.created_at DESC""",
+        (project_id,),
+    ).fetchall()
+    conn.close()
+    return [row_to_dict(r) for r in rows]
+
+
+@app.get("/invitations")
+def list_my_invitations(user_id: int = Depends(get_current_user_id)):
+    """Invitations where I am the invitee (for freelancer inbox)."""
+    conn = get_conn()
+    rows = conn.execute(
+        """SELECT i.id, i.status, i.message, i.created_at, i.responded_at,
+                  p.id as project_id, p.name as project_name, p.client_name,
+                  p.description, p.budget_min, p.budget_max, p.required_skills,
+                  p.timeline_weeks,
+                  inviter.id as inviter_id, inviter.name as inviter_name,
+                  inviter.email as inviter_email
+           FROM project_invitations i
+           JOIN projects p ON p.id = i.project_id
+           JOIN users inviter ON inviter.id = i.inviter_id
+           WHERE i.invitee_id = ?
+           ORDER BY i.created_at DESC""",
+        (user_id,),
+    ).fetchall()
+    conn.close()
+    result = []
+    for r in rows:
+        d = row_to_dict(r)
+        try:
+            d["required_skills"] = json.loads(d.get("required_skills") or "[]")
+        except Exception:
+            d["required_skills"] = []
+        result.append(d)
+    return result
+
+
+@app.patch("/invitations/{invitation_id}")
+def respond_to_invitation(
+    invitation_id: int,
+    body: InvitationPatch,
+    user_id: int = Depends(get_current_user_id),
+):
+    if body.status not in ("accepted", "declined"):
+        raise HTTPException(status_code=422, detail="status must be 'accepted' or 'declined'")
+    conn = get_conn()
+    inv = conn.execute(
+        "SELECT id, invitee_id, status, project_id FROM project_invitations WHERE id = ?",
+        (invitation_id,),
+    ).fetchone()
+    if not inv:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Invitation not found")
+    if inv["invitee_id"] != user_id:
+        conn.close()
+        raise HTTPException(status_code=403, detail="Not your invitation")
+    if inv["status"] != "pending":
+        conn.close()
+        raise HTTPException(status_code=400, detail=f"Already {inv['status']}")
+
+    conn.execute(
+        "UPDATE project_invitations SET status = ?, responded_at = datetime('now') WHERE id = ?",
+        (body.status, invitation_id),
+    )
+    conn.commit()
+    conn.close()
+    return {"ok": True, "status": body.status, "project_id": inv["project_id"]}
+
+
+@app.delete("/invitations/{invitation_id}")
+def cancel_invitation(
+    invitation_id: int,
+    user_id: int = Depends(get_current_user_id),
+):
+    """Inviter (project owner) cancels a pending invitation."""
+    conn = get_conn()
+    inv = conn.execute(
+        """SELECT i.id, i.inviter_id, i.status, i.project_id
+           FROM project_invitations i WHERE i.id = ?""",
+        (invitation_id,),
+    ).fetchone()
+    if not inv:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Invitation not found")
+    if inv["inviter_id"] != user_id:
+        conn.close()
+        raise HTTPException(status_code=403, detail="Not your invitation to cancel")
+    conn.execute("DELETE FROM project_invitations WHERE id = ?", (invitation_id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
 # ── Matches ───────────────────────────────────────────────────────────────────
 
 @app.get("/matches")
@@ -763,6 +2561,15 @@ def list_matches(user_id: int = Depends(get_current_user_id)):
         (opposite_role, user_id),
     ).fetchall()
 
+    # Who have I already marked as interested?
+    interest_rows = conn.execute(
+        "SELECT target_user_id FROM user_interests WHERE user_id = ?", (user_id,)
+    ).fetchall()
+    interest_set = {r["target_user_id"] for r in interest_rows}
+
+    # Embedding-based similarity scores (best-effort)
+    embedding_scores = _embedding_match_scores(user_id, opposite_role)
+
     results = []
     for other_row in others:
         other = row_to_dict(other_row)
@@ -777,12 +2584,22 @@ def list_matches(user_id: int = Depends(get_current_user_id)):
 
         scores = _score_match(freelancer_p, client_p)
 
+        # Hybrid: blend rule-based overall with embedding similarity
+        emb_sim = embedding_scores.get(other["id"])
+        if emb_sim is not None:
+            blended = round(scores["overall"] * 0.65 + emb_sim * 0.35)
+            scores["overall"] = blended
+            scores["embedding"] = emb_sim
+        else:
+            scores["embedding"] = None
+
         # Skip very poor matches (overall < 20)
         if scores["overall"] < 20:
             continue
 
         results.append({
             "id":            f"match_{user_id}_{other['id']}",
+            "userId":        other["id"],
             "clientId":      str(other["id"]),
             "name":          other["name"] or other["email"],
             "role":          other_profile.get("specialty") or other["role"].capitalize(),
@@ -797,6 +2614,7 @@ def list_matches(user_id: int = Depends(get_current_user_id)):
                 "communication": scores["communication"],
                 "timeline":      scores["timeline"],
                 "budget":        scores["budget"],
+                "embedding":     scores["embedding"],
             },
             "explanation":        _build_explanation(freelancer_p, client_p, scores),
             "timelineTightWarning": scores["timelineTightWarning"],
@@ -807,6 +2625,7 @@ def list_matches(user_id: int = Depends(get_current_user_id)):
                                   client_p.get("budget_max") or 0,
                               ),
             "portfolio":      [],
+            "interested":     other["id"] in interest_set,
         })
 
     conn.close()
@@ -918,35 +2737,169 @@ def dashboard_summary(user_id: int = Depends(get_current_user_id)):
 
 # ── Onboarding ────────────────────────────────────────────────────────────────
 
-ONBOARDING_SYSTEM = """You are an AI onboarding assistant for FreelanceOS, a platform that connects
-freelancers with clients. Your job is to gather information from the user conversationally.
-For freelancers: ask about their skills, hourly rate, availability, and past projects.
-For clients: ask about their project needs, budget, timeline, and team size.
-Keep responses concise and friendly. Ask one question at a time."""
+ONBOARDING_SYSTEM_FREELANCER = """You are an AI onboarding assistant for Scout, a platform that connects
+freelancers with clients. Gather the freelancer's profile through friendly, brief, one-question-at-a-time
+conversation. Aim to learn: their main specialty (e.g. Brand Design, Frontend Engineering),
+their top skills/tools, their hourly rate (USD), their general availability, and a 1-2 sentence bio.
+Whenever the user gives information, extract structured fields and call save_profile with what you've
+learned so far. Keep replies under 2 sentences. Once you have specialty + skills + rate + bio, congratulate
+them and tell them their profile is ready."""
+
+ONBOARDING_SYSTEM_CLIENT = """You are an AI onboarding assistant for Scout, a platform that connects
+freelancers with clients. Gather the client's project profile through friendly, brief, one-question-at-a-time
+conversation. Aim to learn: their project title, project description, required skills, total budget range
+(min and max in USD), and timeline (in weeks). Whenever the user gives information, extract structured
+fields and call save_profile with what you've learned so far. Keep replies under 2 sentences. Once you
+have title + description + budget + skills, congratulate them and tell them their project is ready to match."""
+
+PROFILE_EXTRACTION_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "save_profile",
+        "description": "Persist any profile fields you have learned about the user from this conversation.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "specialty":     {"type": "string", "description": "Freelancer specialty/role"},
+                "skills":        {"type": "array",  "items": {"type": "string"}, "description": "Freelancer skills or client required skills"},
+                "hourly_rate_usd": {"type": "number", "description": "Freelancer hourly rate in USD"},
+                "available":     {"type": "boolean", "description": "Freelancer currently available"},
+                "bio":           {"type": "string"},
+                "location":      {"type": "string"},
+                "project_title": {"type": "string", "description": "Client project title"},
+                "project_summary": {"type": "string"},
+                "budget_min_usd":  {"type": "number"},
+                "budget_max_usd":  {"type": "number"},
+                "timeline_weeks":  {"type": "integer"},
+            },
+        },
+    },
+}
+
+
+def _apply_profile_args(user_id: int, role: str, args: dict):
+    """Map LLM-extracted args onto user_profiles columns."""
+    if not args:
+        return
+    patch = {}
+    if "specialty" in args:    patch["specialty"]    = args["specialty"]
+    if "bio" in args:          patch["bio"]          = args["bio"]
+    if "location" in args:     patch["location"]     = args["location"]
+    if "available" in args:    patch["available"]    = int(bool(args["available"]))
+    if "hourly_rate_usd" in args:
+        patch["hourly_rate"] = int(round(float(args["hourly_rate_usd"]) * 100))
+    if "skills" in args and isinstance(args["skills"], list):
+        if role == "client":
+            patch["required_skills"] = json.dumps([str(s) for s in args["skills"]])
+        else:
+            patch["skills"] = json.dumps([str(s) for s in args["skills"]])
+    if "project_title" in args:    patch["project_title"]   = args["project_title"]
+    if "project_summary" in args:  patch["project_summary"] = args["project_summary"]
+    if "budget_min_usd" in args:
+        patch["budget_min"] = int(round(float(args["budget_min_usd"]) * 100))
+    if "budget_max_usd" in args:
+        patch["budget_max"] = int(round(float(args["budget_max_usd"]) * 100))
+
+    if not patch:
+        return
+
+    conn = get_conn()
+    existing = conn.execute(
+        "SELECT user_id FROM user_profiles WHERE user_id = ?", (user_id,)
+    ).fetchone()
+    if existing:
+        set_clause = ", ".join(f"{k} = ?" for k in patch)
+        set_clause += ", updated_at = datetime('now')"
+        conn.execute(
+            f"UPDATE user_profiles SET {set_clause} WHERE user_id = ?",
+            (*patch.values(), user_id),
+        )
+    else:
+        cols = ", ".join(["user_id"] + list(patch.keys()))
+        placeholders = ", ".join(["?"] * (1 + len(patch)))
+        conn.execute(
+            f"INSERT INTO user_profiles ({cols}) VALUES ({placeholders})",
+            (user_id, *patch.values()),
+        )
+    conn.commit()
+    conn.close()
+
+    # Re-embed
+    try:
+        _upsert_profile_embedding(user_id)
+    except Exception:
+        pass
+
 
 @app.post("/onboarding/message")
 async def onboarding_message(
     body: OnboardingMessage,
     user_id: int = Depends(get_current_user_id),
 ):
-    # Try OpenAI; fall back to echo if no key set
+    # Determine user role
+    conn = get_conn()
+    me = conn.execute("SELECT id, role FROM users WHERE id = ?", (user_id,)).fetchone()
+    role = me["role"] if me else "freelancer"
+
+    # Pull recent onboarding history (last 12 turns) so the LLM has context
+    history_rows = conn.execute(
+        """SELECT message, reply FROM onboarding_sessions
+           WHERE user_id = ? ORDER BY id DESC LIMIT 12""",
+        (user_id,),
+    ).fetchall()
+    conn.close()
+
+    history_msgs = []
+    for row in reversed(history_rows):
+        history_msgs.append({"role": "user", "content": row["message"]})
+        history_msgs.append({"role": "assistant", "content": row["reply"]})
+
+    system_prompt = ONBOARDING_SYSTEM_CLIENT if role == "client" else ONBOARDING_SYSTEM_FREELANCER
+    extracted_fields = {}
+    reply = None
+
     openai_key = os.environ.get("OPENAI_API_KEY")
     if openai_key:
         try:
             from openai import AsyncOpenAI
-            client = AsyncOpenAI(api_key=openai_key)
-            resp = await client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": ONBOARDING_SYSTEM},
-                    {"role": "user", "content": body.message},
-                ],
-                max_tokens=256,
+            oai = AsyncOpenAI(api_key=openai_key)
+            messages = (
+                [{"role": "system", "content": system_prompt}]
+                + history_msgs
+                + [{"role": "user", "content": body.message}]
             )
-            reply = resp.choices[0].message.content
+            resp = await oai.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=messages,
+                tools=[PROFILE_EXTRACTION_TOOL],
+                max_tokens=300,
+            )
+            choice = resp.choices[0].message
+            # Handle tool calls (may be 0..n)
+            for tc in (choice.tool_calls or []):
+                if tc.function and tc.function.name == "save_profile":
+                    try:
+                        args = json.loads(tc.function.arguments or "{}")
+                        extracted_fields.update(args)
+                        _apply_profile_args(user_id, role, args)
+                    except Exception as e:
+                        print(f"[Onboarding] tool-call parse error: {e}")
+            # If the model only called a tool and didn't speak, ask for follow-up
+            if choice.content:
+                reply = choice.content
+            else:
+                follow = await oai.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=messages + [
+                        {"role": "assistant", "content": "(profile updated — what should I ask next?)"},
+                    ],
+                    max_tokens=180,
+                )
+                reply = follow.choices[0].message.content or "Got it — what else should I know?"
         except Exception as e:
             reply = f"(LLM error: {e}) Echo: {body.message}"
-    else:
+
+    if reply is None:
         reply = (
             f"(No OPENAI_API_KEY set — echo mode) You said: \"{body.message}\". "
             "Set OPENAI_API_KEY in your environment to enable real AI responses."
@@ -954,12 +2907,71 @@ async def onboarding_message(
 
     conn = get_conn()
     conn.execute(
-        "INSERT INTO onboarding_sessions (user_id, message, reply) VALUES (?, ?, ?)",
-        (user_id, body.message, reply),
+        "INSERT INTO onboarding_sessions (user_id, role, message, reply) VALUES (?, ?, ?, ?)",
+        (user_id, role, body.message, reply),
     )
     conn.commit()
     conn.close()
-    return {"reply": reply}
+    return {"reply": reply, "extracted": extracted_fields}
+
+# ── Message read-state (unread badges) ───────────────────────────────────────
+
+@app.get("/unread-counts")
+def unread_counts(user_id: int = Depends(get_current_user_id)):
+    """
+    Return { project_id: unread_count, _total: N } for projects the user can access.
+    Unread = messages sent by others after the user's last_read_at for that project.
+    """
+    conn = get_conn()
+    # All projects user can see (owner or accepted invitee)
+    rows = conn.execute(
+        """SELECT DISTINCT p.id FROM projects p
+           LEFT JOIN project_invitations i
+             ON i.project_id = p.id AND i.invitee_id = ? AND i.status = 'accepted'
+           WHERE p.owner_id = ? OR i.id IS NOT NULL""",
+        (user_id, user_id),
+    ).fetchall()
+    per_project = {}
+    total = 0
+    for r in rows:
+        pid = r["id"]
+        last_read_row = conn.execute(
+            "SELECT last_read_at FROM message_reads WHERE project_id = ? AND user_id = ?",
+            (pid, user_id),
+        ).fetchone()
+        last_read = last_read_row["last_read_at"] if last_read_row else "1970-01-01 00:00:00"
+        cnt_row = conn.execute(
+            """SELECT COUNT(*) as cnt FROM messages
+               WHERE project_id = ? AND sender_id != ? AND created_at > ?""",
+            (pid, user_id, last_read),
+        ).fetchone()
+        cnt = cnt_row["cnt"] if cnt_row else 0
+        per_project[str(pid)] = cnt
+        total += cnt
+    conn.close()
+    per_project["_total"] = total
+    return per_project
+
+
+@app.post("/projects/{project_id}/read")
+def mark_project_read(project_id: int, user_id: int = Depends(get_current_user_id)):
+    conn = get_conn()
+    try:
+        _check_project_access(conn, project_id, user_id)
+    except HTTPException:
+        conn.close(); raise
+    # Use sub-second resolution so a mark-read won't tie with a message created in the same second.
+    conn.execute(
+        """INSERT INTO message_reads (project_id, user_id, last_read_at)
+           VALUES (?, ?, strftime('%Y-%m-%d %H:%M:%f', 'now'))
+           ON CONFLICT(project_id, user_id) DO UPDATE SET
+             last_read_at = strftime('%Y-%m-%d %H:%M:%f', 'now')""",
+        (project_id, user_id),
+    )
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
 
 # ── WebSocket chat ────────────────────────────────────────────────────────────
 
@@ -976,17 +2988,43 @@ async def websocket_chat(websocket: WebSocket, project_id: str, token: str = "")
     user = get_user_by_id(user_id)
     user_name = user["name"] or user["email"]
 
+    # Authorize: must be project owner OR accepted invitee
+    try:
+        pid_int = int(project_id)
+    except (TypeError, ValueError):
+        pid_int = None
+    if pid_int is not None:
+        _c = get_conn()
+        proj = _c.execute(
+            "SELECT owner_id FROM projects WHERE id = ?", (pid_int,)
+        ).fetchone()
+        authorized = False
+        if proj and proj["owner_id"] == user_id:
+            authorized = True
+        else:
+            inv = _c.execute(
+                "SELECT status FROM project_invitations WHERE project_id = ? AND invitee_id = ?",
+                (pid_int, user_id),
+            ).fetchone()
+            if inv and inv["status"] == "accepted":
+                authorized = True
+        _c.close()
+        if not authorized:
+            await websocket.close(code=4003)
+            return
+
     await websocket.accept()
     manager.join(project_id, websocket, user_id, user_name)
 
     # Send chat history
     conn = get_conn()
     rows = conn.execute(
-        """SELECT m.id, m.text, m.sender_id, m.sender_name, m.created_at
+        """SELECT m.id, m.text, m.sender_id, m.sender_name, m.created_at,
+                  m.attachment_url, m.attachment_name, m.attachment_type, m.attachment_size
            FROM messages m
            WHERE m.project_id = ?
            ORDER BY m.created_at ASC
-           LIMIT 100""",
+           LIMIT 200""",
         (project_id,),
     ).fetchall()
     conn.close()
@@ -1095,12 +3133,34 @@ Respond with JSON only."""
 
         result = json.loads(resp.choices[0].message.content)
         if result.get("is_scope_creep"):
+            flag_msg = result.get("message", "Possible scope creep detected.")
+            suggested_reply = result.get("suggested_reply")
+            contract_clause = result.get("contract_clause")
+
+            # Persist the flag so it shows up in Scope Drift Report later
+            try:
+                pid_int = int(project_id)
+                _c = get_conn()
+                _c.execute(
+                    """INSERT INTO scope_flags
+                       (project_id, message_id, severity, message, suggested_reply, contract_clause)
+                       VALUES (?, ?, ?, ?, ?, ?)""",
+                    (pid_int, msg_id, "MEDIUM", flag_msg, suggested_reply, contract_clause),
+                )
+                _c.commit()
+                flag_id = _c.execute("SELECT last_insert_rowid()").fetchone()[0]
+                _c.close()
+            except Exception as e:
+                print(f"[ScopeGuardian] persist failed: {e}")
+                flag_id = None
+
             alert = {
-                "id": f"scope_{msg_id}_{uuid.uuid4().hex[:6]}",
+                "id": f"scope_{flag_id or msg_id}_{uuid.uuid4().hex[:6]}",
+                "flag_id": flag_id,
                 "after_message_id": msg_id,
-                "message": result.get("message", "Possible scope creep detected."),
-                "suggested_reply": result.get("suggested_reply"),
-                "contract_clause": result.get("contract_clause"),
+                "message": flag_msg,
+                "suggested_reply": suggested_reply,
+                "contract_clause": contract_clause,
             }
             try:
                 await sender_ws.send_text(json.dumps({"type": "scope_alert", "payload": alert}))
