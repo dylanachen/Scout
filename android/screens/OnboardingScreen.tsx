@@ -10,7 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 
 /* ── Step definitions (mirroring the web onboardingFlows) ──────── */
@@ -108,8 +108,9 @@ type Props = {
 };
 
 export default function OnboardingScreen({ navigation, onComplete }: Props) {
+  const { t } = useTranslation();
   const { user } = useAuth();
-  const firstName = user?.name?.split(' ')[0] || 'there';
+  const firstName = user?.name?.split(' ')[0] || t('onboardingScreen.defaultName');
   const userRole = user?.role || 'freelancer';
   const steps = userRole === 'client' ? CLIENT_STEPS : FREELANCER_STEPS;
 
@@ -310,8 +311,8 @@ export default function OnboardingScreen({ navigation, onComplete }: Props) {
             <View style={styles.assistantBubble}>
               <Text style={styles.assistantText}>
                 {userRole === 'client'
-                  ? "You're all set! Let me find you some great matches..."
-                  : "Awesome \u2014 you're all set! Taking you to your dashboard..."}
+                  ? t('onboardingScreen.doneClient')
+                  : t('onboardingScreen.doneFreelancer')}
               </Text>
             </View>
           </View>
@@ -378,7 +379,7 @@ export default function OnboardingScreen({ navigation, onComplete }: Props) {
                 style={styles.textInput}
                 value={input}
                 onChangeText={setInput}
-                placeholder={currentStep?.placeholder || 'Type your answer...'}
+                placeholder={currentStep?.placeholder || t('onboardingScreen.typeAnswer')}
                 placeholderTextColor="#9aa0ae"
                 onSubmitEditing={handleSend}
                 returnKeyType="send"
@@ -390,7 +391,7 @@ export default function OnboardingScreen({ navigation, onComplete }: Props) {
             )}
             {showMultiConfirm ? (
               <TouchableOpacity style={styles.sendBtn} onPress={handleSend}>
-                <Text style={styles.sendBtnText}>Done</Text>
+                <Text style={styles.sendBtnText}>{t('chat.done')}</Text>
               </TouchableOpacity>
             ) : showTextInput ? (
               <TouchableOpacity
@@ -399,7 +400,7 @@ export default function OnboardingScreen({ navigation, onComplete }: Props) {
                 disabled={!input.trim() && !currentStep?.optional}
               >
                 <Text style={styles.sendBtnText}>
-                  {!input.trim() && currentStep?.optional ? 'Skip' : 'Send'}
+                  {!input.trim() && currentStep?.optional ? t('onboardingScreen.skip') : t('chat.send')}
                 </Text>
               </TouchableOpacity>
             ) : null}

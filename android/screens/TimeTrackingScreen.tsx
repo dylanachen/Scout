@@ -9,6 +9,7 @@ import {
   Modal,
   SectionList,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { api } from '../api/client';
 import useDemoActive from '../hooks/useDemoActive';
 
@@ -39,6 +40,7 @@ function formatTime(seconds: number) {
 }
 
 export default function TimeTrackingScreen() {
+  const { t } = useTranslation();
   const demoActive = useDemoActive();
   const [elapsed, setElapsed] = useState(0);
   const [running, setRunning] = useState(false);
@@ -118,7 +120,7 @@ export default function TimeTrackingScreen() {
         project: selectedProject,
         date: new Date().toISOString().slice(0, 10),
         hours: Math.round((elapsed / 3600) * 100) / 100,
-        description: stopNote || 'Timer session',
+        description: stopNote || t('timeTrackingScreen.timerSession'),
         planned: stopPlanned,
       };
       setEntries((prev) => [newEntry, ...prev]);
@@ -137,7 +139,7 @@ export default function TimeTrackingScreen() {
       project: manualProject,
       date: manualDate,
       hours: hrs,
-      description: manualDesc || 'Manual entry',
+      description: manualDesc || t('timeTrackingScreen.manualEntry'),
       planned: manualPlanned,
     };
     setEntries((prev) => [newEntry, ...prev]);
@@ -191,7 +193,7 @@ export default function TimeTrackingScreen() {
 
   return (
     <ScrollView style={s.container} contentContainerStyle={{ paddingBottom: 40 }}>
-      <Text style={s.heading}>Time Tracking</Text>
+      <Text style={s.heading}>{t('timeTrackingScreen.title')}</Text>
 
       {/* Timer */}
       <View style={s.card}>
@@ -199,13 +201,13 @@ export default function TimeTrackingScreen() {
         <ProjectDropdown value={selectedProject} onSelect={setSelectedProject} open={showProjectPicker} setOpen={setShowProjectPicker} />
         <View style={s.btnRow}>
           <TouchableOpacity style={[s.btn, { backgroundColor: '#16a34a' }]} onPress={handleStart} disabled={running}>
-            <Text style={s.btnLabel}>Start</Text>
+            <Text style={s.btnLabel}>{t('timeTrackingScreen.start')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[s.btn, { backgroundColor: '#d97706' }]} onPress={handlePause} disabled={!running}>
-            <Text style={s.btnLabel}>Pause</Text>
+            <Text style={s.btnLabel}>{t('timeTrackingScreen.pause')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[s.btn, { backgroundColor: '#dc2626' }]} onPress={handleStop} disabled={elapsed === 0}>
-            <Text style={s.btnLabel}>Stop</Text>
+            <Text style={s.btnLabel}>{t('timeTrackingScreen.stop')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -214,24 +216,24 @@ export default function TimeTrackingScreen() {
       <Modal visible={showStopModal} transparent animationType="fade">
         <View style={s.modalOverlay}>
           <View style={s.modal}>
-            <Text style={s.modalTitle}>What were you working on?</Text>
-            <TextInput style={s.input} placeholder="Description..." value={stopNote} onChangeText={setStopNote} />
+            <Text style={s.modalTitle}>{t('timeTrackingScreen.workedOn')}</Text>
+            <TextInput style={s.input} placeholder={t('timeTrackingScreen.descriptionPlaceholder')} value={stopNote} onChangeText={setStopNote} />
             <View style={s.toggleRow}>
-              <Text style={s.toggleLabel}>Planned or unplanned?</Text>
+              <Text style={s.toggleLabel}>{t('timeTrackingScreen.plannedOrUnplanned')}</Text>
               <TouchableOpacity
                 style={[s.toggle, stopPlanned ? s.toggleOn : s.toggleOff]}
                 onPress={() => setStopPlanned(!stopPlanned)}
               >
-                <Text style={s.toggleText}>{stopPlanned ? 'Planned' : 'Unplanned'}</Text>
+                <Text style={s.toggleText}>{stopPlanned ? t('timeTrackingScreen.planned') : t('timeTrackingScreen.unplanned')}</Text>
               </TouchableOpacity>
             </View>
             {!stopPlanned && (
               <View style={s.warningBanner}>
-                <Text style={s.warningText}>This session will be logged as unplanned work</Text>
+                <Text style={s.warningText}>{t('timeTrackingScreen.unplannedSessionWarning')}</Text>
               </View>
             )}
             <TouchableOpacity style={s.primaryBtn} onPress={handleSaveStop}>
-              <Text style={s.primaryBtnText}>Save</Text>
+              <Text style={s.primaryBtnText}>{t('common.save')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -239,43 +241,43 @@ export default function TimeTrackingScreen() {
 
       {/* Manual entry */}
       <TouchableOpacity style={s.manualToggle} onPress={() => setShowManual(!showManual)}>
-        <Text style={s.manualToggleText}>{showManual ? 'Hide manual entry' : '+ Add manual entry'}</Text>
+        <Text style={s.manualToggleText}>{showManual ? t('timeTrackingScreen.hideManual') : t('timeTrackingScreen.addManual')}</Text>
       </TouchableOpacity>
 
       {showManual && (
         <View style={s.card}>
-          <Text style={s.sectionTitle}>Manual Entry</Text>
+          <Text style={s.sectionTitle}>{t('timeTrackingScreen.manualEntryTitle')}</Text>
           <ProjectDropdown value={manualProject} onSelect={setManualProject} open={showManualPicker} setOpen={setShowManualPicker} />
-          <TextInput style={s.input} placeholder="Date (YYYY-MM-DD)" value={manualDate} onChangeText={setManualDate} />
-          <TextInput style={s.input} placeholder="Hours" keyboardType="numeric" value={manualHours} onChangeText={setManualHours} />
-          <TextInput style={s.input} placeholder="Description" value={manualDesc} onChangeText={setManualDesc} />
+          <TextInput style={s.input} placeholder={t('timeTrackingScreen.datePlaceholder')} value={manualDate} onChangeText={setManualDate} />
+          <TextInput style={s.input} placeholder={t('timeTrackingScreen.hoursPlaceholder')} keyboardType="numeric" value={manualHours} onChangeText={setManualHours} />
+          <TextInput style={s.input} placeholder={t('timeTrackingScreen.descriptionLabel')} value={manualDesc} onChangeText={setManualDesc} />
           <View style={s.toggleRow}>
-            <Text style={s.toggleLabel}>Planned?</Text>
+            <Text style={s.toggleLabel}>{t('timeTrackingScreen.plannedQ')}</Text>
             <TouchableOpacity
               style={[s.toggle, manualPlanned ? s.toggleOn : s.toggleOff]}
               onPress={() => setManualPlanned(!manualPlanned)}
             >
-              <Text style={s.toggleText}>{manualPlanned ? 'Planned' : 'Unplanned'}</Text>
+              <Text style={s.toggleText}>{manualPlanned ? t('timeTrackingScreen.planned') : t('timeTrackingScreen.unplanned')}</Text>
             </TouchableOpacity>
           </View>
           {!manualPlanned && (
             <View style={s.warningBanner}>
-              <Text style={s.warningText}>This entry will be logged as unplanned work</Text>
+              <Text style={s.warningText}>{t('timeTrackingScreen.unplannedEntryWarning')}</Text>
             </View>
           )}
           <View style={s.btnRow}>
             <TouchableOpacity style={s.primaryBtn} onPress={handleSaveManual}>
-              <Text style={s.primaryBtnText}>Save Entry</Text>
+              <Text style={s.primaryBtnText}>{t('timeTrackingScreen.saveEntry')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={s.ghostBtn} onPress={() => setShowManual(false)}>
-              <Text style={s.ghostBtnText}>Cancel</Text>
+              <Text style={s.ghostBtnText}>{t('common.cancel')}</Text>
             </TouchableOpacity>
           </View>
         </View>
       )}
 
       {/* Time entries list */}
-      <Text style={[s.sectionTitle, { marginTop: 20, marginHorizontal: 16 }]}>Time Entries</Text>
+      <Text style={[s.sectionTitle, { marginTop: 20, marginHorizontal: 16 }]}>{t('timeTrackingScreen.timeEntries')}</Text>
       {sections.map((section) => (
         <View key={section.title} style={s.section}>
           <Text style={s.dateHeader}>{section.title}</Text>
@@ -287,7 +289,7 @@ export default function TimeTrackingScreen() {
               </View>
               <View style={{ alignItems: 'flex-end', gap: 2 }}>
                 <Text style={s.entryHours}>{entry.hours}h</Text>
-                {!entry.planned && <Text style={s.unplannedBadge}>Unplanned</Text>}
+                {!entry.planned && <Text style={s.unplannedBadge}>{t('timeTrackingScreen.unplanned')}</Text>}
               </View>
             </View>
           ))}

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import MetricCard from '../components/MetricCard';
 import ProjectCard from '../components/ProjectCard';
 import { useAuth } from '../hooks/useAuth';
@@ -8,8 +9,12 @@ import { formatCurrencyFromCents, formatShortDate, greetingPrefix, firstName } f
 import { useNotifications } from '../hooks/useNotifications';
 import { formatRelativeTime } from '../utils/notificationModel';
 import { NotificationTypeIcon } from '../components/NotificationIcons';
+import EmptyState from '../components/states/EmptyState';
+import ErrorState from '../components/states/ErrorState';
+import Skeleton from '../components/states/Skeleton';
 
 export default function Dashboard() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { loading, err, stats, projects, pendingMatches } = useDashboardData();
   const { items: notificationItems } = useNotifications();
@@ -45,6 +50,7 @@ export default function Dashboard() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <Link
             to="/pipeline"
+            aria-label={t('dashboardPage.pipelineView')}
             style={{
               padding: '10px 14px',
               borderRadius: 10,
@@ -56,11 +62,12 @@ export default function Dashboard() {
               background: 'var(--color-surface)',
             }}
           >
-            Pipeline view
+            {t('dashboardPage.pipelineView')}
           </Link>
           <Link
             to="/onboarding"
             className="scout-start-project-btn"
+            aria-label={t('dashboardPage.startProject')}
             style={{
               padding: '10px 18px',
               borderRadius: 10,
@@ -72,20 +79,37 @@ export default function Dashboard() {
               boxShadow: '0 4px 14px rgba(29, 110, 205, 0.35)',
             }}
           >
-            Start a New Project
+            {t('dashboardPage.startProject')}
           </Link>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            style={{
+              padding: '10px 14px',
+              borderRadius: 10,
+              border: '1px solid var(--color-border)',
+              color: 'var(--color-text)',
+              fontWeight: 600,
+              fontSize: 13,
+              background: 'var(--color-surface)',
+              cursor: 'pointer',
+              fontFamily: 'var(--font-sans)',
+            }}
+            aria-label={t('dashboardPage.refresh')}
+          >
+            {t('dashboardPage.refresh')}
+          </button>
         </div>
       </div>
 
-      {err && (
-        <div style={{ marginBottom: 16, padding: 12, borderRadius: 10, background: '#fef2f2', color: '#991b1b', fontSize: 13 }}>
-          {err}
+      {err ? <ErrorState message={err} onRetry={() => window.location.reload()} /> : null}
+      {loading ? (
+        <div style={{ marginBottom: 16, display: 'grid', gap: 8 }}>
+          <Skeleton height={22} />
+          <Skeleton height={84} />
+          <Skeleton height={84} />
         </div>
-      )}
-
-      {loading && (
-        <div style={{ marginBottom: 16, fontSize: 13, color: 'var(--color-text-3)' }}>Loading dashboard…</div>
-      )}
+      ) : null}
 
       <div
         style={{
@@ -95,17 +119,27 @@ export default function Dashboard() {
           marginBottom: 28,
         }}
       >
-        <MetricCard label="Active projects" value={String(stats.active_projects ?? 0)} unit="projects" href="/projects" />
-        <MetricCard label="Hours this week" value={stats.hours_logged_week != null ? String(stats.hours_logged_week) : '—'} unit="hrs" href="/time/week" />
         <MetricCard
-          label="Pending invoices"
+          label={t('dashboardPage.metrics.activeProjects')}
+          value={String(stats.active_projects ?? 0)}
+          unit={t('dashboardPage.metrics.projectsUnit')}
+          href="/projects"
+        />
+        <MetricCard
+          label={t('dashboardPage.metrics.hoursThisWeek')}
+          value={stats.hours_logged_week != null ? String(stats.hours_logged_week) : '—'}
+          unit={t('dashboardPage.metrics.hoursUnit')}
+          href="/time/week"
+        />
+        <MetricCard
+          label={t('dashboardPage.metrics.pendingInvoices')}
           value={String(stats.pending_invoices_count ?? 0)}
-          hint={stats.pending_invoices_total_cents != null ? `${pendingTotal} total` : undefined}
+          hint={stats.pending_invoices_total_cents != null ? t('dashboardPage.metrics.totalSuffix', { total: pendingTotal }) : undefined}
           hintColor="#16a34a"
           href="/invoices"
         />
         <MetricCard
-          label="Unread messages"
+          label={t('dashboardPage.metrics.unreadMessages')}
           value={String(stats.unread_messages ?? 0)}
           badge={stats.unread_messages ?? 0}
           href="/notifications"
@@ -114,9 +148,9 @@ export default function Dashboard() {
 
       <section style={{ marginBottom: 28 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 12 }}>
-          <h2 style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>Active projects</h2>
+          <h2 style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>{t('dashboardPage.activeProjects')}</h2>
           <Link to="/projects" style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-primary)', textDecoration: 'none' }}>
-            View all
+            {t('dashboardPage.viewAll')}
           </Link>
         </div>
         <div className="dashboard-projects-scroll">
@@ -124,38 +158,19 @@ export default function Dashboard() {
             {projects.map((p) => (
               <ProjectCard key={p.id} project={p} />
             ))}
-            {!projects.length && !loading && (
-              <div
-                style={{
-                  border: '2px dashed var(--color-border)',
-                  borderRadius: 14,
-                  padding: '40px 20px',
-                  textAlign: 'center',
-                  gridColumn: '1 / -1',
-                }}
-              >
-                <p style={{ fontSize: 14, color: 'var(--color-text-3)', margin: '0 0 16px' }}>No active projects</p>
-                <Link
-                  to="/onboarding"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: 48,
-                    height: 48,
-                    borderRadius: '50%',
-                    background: 'var(--color-primary)',
-                    color: '#fff',
-                    textDecoration: 'none',
-                    boxShadow: '0 4px 14px rgba(29, 110, 205, 0.35)',
-                  }}
-                >
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
-                    <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
-                </Link>
+            {!projects.length && !loading ? (
+              <div style={{ gridColumn: '1 / -1' }}>
+                <EmptyState
+                  title={t('dashboardPage.noActiveProjects')}
+                  message={t('projects.empty')}
+                  action={(
+                    <Link to="/onboarding" style={{ color: 'var(--color-primary)', fontWeight: 700, textDecoration: 'none' }}>
+                      {t('dashboardPage.startProject')}
+                    </Link>
+                  )}
+                />
               </div>
-            )}
+            ) : null}
           </div>
         </div>
       </section>
@@ -178,7 +193,7 @@ export default function Dashboard() {
               fontFamily: 'var(--font-sans)',
             }}
           >
-            <h2 style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>Pending matches</h2>
+            <h2 style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>{t('dashboardPage.pendingMatches')}</h2>
             <span
               style={{
                 minWidth: 20,
@@ -250,7 +265,7 @@ export default function Dashboard() {
                       }}
                       onClick={() => setDismissed((s) => new Set(s).add(m.id))}
                     >
-                      Accept
+                      {t('dashboardPage.matchesActions.accept')}
                     </button>
                     <button
                       type="button"
@@ -266,7 +281,7 @@ export default function Dashboard() {
                       }}
                       onClick={() => setDismissed((s) => new Set(s).add(m.id))}
                     >
-                      Pass
+                      {t('dashboardPage.matchesActions.pass')}
                     </button>
                   </div>
                 </li>
@@ -278,9 +293,9 @@ export default function Dashboard() {
 
       <section style={{ marginBottom: 88 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 12 }}>
-          <h2 style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>Recent Activity</h2>
+          <h2 style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>{t('dashboardPage.recentActivity')}</h2>
           <Link to="/notifications" style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-primary)', textDecoration: 'none' }}>
-            View all notifications
+            {t('dashboardPage.viewAllNotifications')}
           </Link>
         </div>
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 0 }}>
@@ -307,7 +322,7 @@ export default function Dashboard() {
             </li>
           ))}
           {!notificationItems.length && !loading && (
-            <li style={{ fontSize: 13, color: 'var(--color-text-3)', padding: '8px 0' }}>No notifications.</li>
+            <li style={{ fontSize: 13, color: 'var(--color-text-3)', padding: '8px 0' }}>{t('dashboardPage.noNotifications')}</li>
           )}
         </ul>
       </section>
@@ -315,7 +330,7 @@ export default function Dashboard() {
       <Link
         to="/onboarding"
         className="scout-fab"
-        aria-label="Start a New Project"
+        aria-label={t('dashboardPage.fabAria')}
         style={{
           position: 'fixed',
           right: 20,

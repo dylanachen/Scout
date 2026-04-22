@@ -4,19 +4,32 @@
     "slug": "scout-android",
     "version": "1.0.0",
     "orientation": "portrait",
-    "userInterfaceStyle": "light",
-    "assetBundlePatterns": ["**/*"],
-    "ios": { "supportsTablet": true },
+    "userInterfaceStyle": "automatic",
+    "scheme": "scout",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
     "android": {
-      "adaptiveIcon": { "backgroundColor": "#0f1623" }
+      "adaptiveIcon": {
+        "backgroundColor": "#0f1623"
+      }
     },
     "plugins": [
+      "expo-splash-screen",
       [
         "expo-image-picker",
         {
           "photosPermission": "Allow Scout to access your photos to set a profile picture."
         }
-      ]
-    ]
+      ],
+      "expo-sharing"
+    ],
+    "splash": {
+      "backgroundColor": "#0f1623",
+      "resizeMode": "contain"
+    }
   }
 }

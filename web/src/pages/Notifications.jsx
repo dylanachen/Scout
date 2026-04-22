@@ -1,7 +1,11 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNotifications } from '../hooks/useNotifications';
 import NotificationRow from '../components/NotificationRow';
 import { FILTER_TABS, notificationMatchesFilter } from '../utils/notificationModel';
+import EmptyState from '../components/states/EmptyState';
+import ErrorState from '../components/states/ErrorState';
+import Skeleton from '../components/states/Skeleton';
 
 const tabLabels = [
   [FILTER_TABS.ALL, 'All'],
@@ -13,6 +17,7 @@ const tabLabels = [
 ];
 
 export default function Notifications() {
+  const { t } = useTranslation();
   const { loading, err, items, markAllRead, markRead, isRead, unreadCount } = useNotifications();
   const [filter, setFilter] = useState(FILTER_TABS.ALL);
 
@@ -37,27 +42,46 @@ export default function Notifications() {
         }}
       >
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 6px', letterSpacing: '-0.03em' }}>Notifications</h1>
-          <p style={{ fontSize: 13, color: 'var(--color-text-3)', margin: 0 }}>Updates across projects, invoices, and matches.</p>
+          <h1 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 6px', letterSpacing: '-0.03em' }}>{t('notificationsPage.title')}</h1>
+          <p style={{ fontSize: 13, color: 'var(--color-text-3)', margin: 0 }}>{t('notificationsPage.subtitle')}</p>
         </div>
-        <button
-          type="button"
-          onClick={() => markAllRead()}
-          disabled={unreadCount === 0}
-          style={{
-            padding: '8px 14px',
-            borderRadius: 10,
-            border: '1px solid var(--color-border)',
-            background: unreadCount === 0 ? 'var(--color-surface-2)' : 'var(--color-surface)',
-            color: unreadCount === 0 ? 'var(--color-text-3)' : 'var(--color-primary)',
-            fontSize: 13,
-            fontWeight: 600,
-            cursor: unreadCount === 0 ? 'default' : 'pointer',
-            fontFamily: 'var(--font-sans)',
-          }}
-        >
-          Mark all as read
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => markAllRead()}
+            disabled={unreadCount === 0}
+            style={{
+              padding: '8px 14px',
+              borderRadius: 10,
+              border: '1px solid var(--color-border)',
+              background: unreadCount === 0 ? 'var(--color-surface-2)' : 'var(--color-surface)',
+              color: unreadCount === 0 ? 'var(--color-text-3)' : 'var(--color-primary)',
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: unreadCount === 0 ? 'default' : 'pointer',
+              fontFamily: 'var(--font-sans)',
+            }}
+          >
+            {t('notificationsPage.markAllRead')}
+          </button>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            style={{
+              padding: '8px 14px',
+              borderRadius: 10,
+              border: '1px solid var(--color-border)',
+              background: 'var(--color-surface)',
+              color: 'var(--color-text)',
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontFamily: 'var(--font-sans)',
+            }}
+          >
+            {t('notificationsPage.refresh')}
+          </button>
+        </div>
       </div>
 
       <div
@@ -99,10 +123,14 @@ export default function Notifications() {
         })}
       </div>
 
-      {err && (
-        <div style={{ marginBottom: 16, padding: 12, borderRadius: 10, background: '#fef2f2', color: '#991b1b', fontSize: 13 }}>{err}</div>
-      )}
-      {loading && <div style={{ marginBottom: 16, fontSize: 13, color: 'var(--color-text-3)' }}>Loading…</div>}
+      {err ? <ErrorState message={err} onRetry={() => window.location.reload()} /> : null}
+      {loading ? (
+        <div style={{ marginBottom: 16, display: 'grid', gap: 8 }}>
+          <Skeleton height={58} />
+          <Skeleton height={58} />
+          <Skeleton height={58} />
+        </div>
+      ) : null}
 
       <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
         {filtered.map((n) => (
@@ -115,11 +143,14 @@ export default function Notifications() {
             <NotificationRow n={n} unread={!isRead(n.id)} markRead={markRead} />
           </li>
         ))}
-        {!filtered.length && !loading && (
-          <li style={{ fontSize: 13, color: 'var(--color-text-3)', padding: '24px 0' }}>
-            {filter === FILTER_TABS.UNREAD ? 'No unread notifications.' : 'No notifications in this view.'}
+        {!filtered.length && !loading ? (
+          <li style={{ padding: '20px 0' }}>
+            <EmptyState
+              title={t('notificationsPage.title')}
+              message={filter === FILTER_TABS.UNREAD ? t('notificationsPage.noUnread') : t('notificationsPage.noInView')}
+            />
           </li>
-        )}
+        ) : null}
       </ul>
     </div>
   );

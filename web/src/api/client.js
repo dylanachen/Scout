@@ -17,3 +17,18 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    window.dispatchEvent(
+      new CustomEvent('scout-toast', {
+        detail: {
+          type: 'error',
+          message: error?.response?.data?.detail || error?.message || 'Request failed',
+        },
+      }),
+    );
+    return Promise.reject(error);
+  },
+);

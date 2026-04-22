@@ -32,7 +32,6 @@ export default function SignUp() {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [role, setRole] = useState('');
-  const [termsAccepted, setTermsAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState('');
   const [shaking, setShaking] = useState(false);
@@ -65,8 +64,7 @@ export default function SignUp() {
     email.trim() &&
     password.length >= 8 &&
     confirm === password &&
-    role &&
-    termsAccepted;
+    role;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -78,7 +76,7 @@ export default function SignUp() {
     setErrors({ fullName: eName, email: eEmail, password: ePass, confirm: eConf });
     setTouched({ fullName: true, email: true, password: true, confirm: true });
 
-    if (eName || eEmail || ePass || eConf || !role || !termsAccepted) {
+    if (eName || eEmail || ePass || eConf || !role) {
       setShaking(true);
       setTimeout(() => setShaking(false), 500);
       return;
@@ -311,45 +309,6 @@ export default function SignUp() {
             </div>
           </button>
         </div>
-
-        {/* Terms checkbox */}
-        <label
-          style={{
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: 8,
-            fontSize: 13,
-            color: 'var(--color-text-2)',
-            cursor: 'pointer',
-            marginBottom: 20,
-            lineHeight: 1.45,
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={termsAccepted}
-            onChange={(e) => setTermsAccepted(e.target.checked)}
-            style={{ marginTop: 3, accentColor: 'var(--color-primary)' }}
-          />
-          <span>
-            I agree to the{' '}
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); alert('Terms of Service — coming soon'); }}
-              style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontWeight: 600, cursor: 'pointer', padding: 0, fontSize: 'inherit', fontFamily: 'inherit', textDecoration: 'underline' }}
-            >
-              Terms of Service
-            </button>{' '}
-            and{' '}
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); alert('Privacy Policy — coming soon'); }}
-              style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontWeight: 600, cursor: 'pointer', padding: 0, fontSize: 'inherit', fontFamily: 'inherit', textDecoration: 'underline' }}
-            >
-              Privacy Policy
-            </button>
-          </span>
-        </label>
 
         {/* Submit */}
         <button

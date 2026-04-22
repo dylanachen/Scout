@@ -1,16 +1,23 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import MatchCard from '../components/MatchCard';
+import MatchCompareModal from '../components/MatchCompareModal';
+import WhyThisMatchDrawer from '../components/WhyThisMatchDrawer';
 import { isDemoMode } from '../api/demoAdapter';
 import { MOCK_MATCHES } from '../data/mockMatches';
 import { useAuth } from '../hooks/useAuth';
 import { getAggregatedReputation, getClientCompletedProjectCount } from '../utils/clientReputationStorage';
+import { lsRead, lsWrite } from '../utils/localStore';
+import { showToast } from '../utils/toast';
+
+const SAVED_KEY = 'scout_saved_searches';
 
 const SORTS = [
-  { id: 'overall', label: 'Best Match' },
-  { id: 'skillFit', label: 'Skill Fit' },
-  { id: 'timeline', label: 'Timeline' },
-  { id: 'budget', label: 'Budget' },
+  { id: 'overall', labelKey: 'matches.sorts.bestMatch' },
+  { id: 'skillFit', labelKey: 'matches.sorts.skillFit' },
+  { id: 'timeline', labelKey: 'matches.sorts.timeline' },
+  { id: 'budget', labelKey: 'matches.sorts.budget' },
 ];
 
 function EmptyMatchesIllustration() {
@@ -36,15 +43,84 @@ function EmptyMatchesIllustration() {
 }
 
 export default function MatchResults() {
+  const { t } = useTranslation();
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const forceEmpty = params.get('empty') === '1';
 
   const [sortBy, setSortBy] = useState('overall');
+  const [minimumRating, setMinimumRating] = useState(0);
+  const [skillFilter, setSkillFilter] = useState('all');
+  const [visibleCount, setVisibleCount] = useState(8);
   const [passedIds, setPassedIds] = useState(() => new Set());
   const [interestIds, setInterestIds] = useState(() => new Set());
   const [repBump, setRepBump] = useState(0);
+  const [savedSearches, setSavedSearches] = useState(() => lsRead(SAVED_KEY, []));
+  const [compareIds, setCompareIds] = useState(() => new Set());
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [whyMatch, setWhyMatch] = useState(null);
+
+  const saveCurrentSearch = () => {
+    const entry = {
+      id: `ss_${Date.now()}`,
+      name: [sortBy, minimumRating ? `${minimumRating}+` : null, skillFilter !== 'all' ? skillFilter : null].filter(Boolean).join(' · '),
+      sortBy,
+      minimumRating,
+      skillFilter,
+      savedAt: new Date().toISOString(),
+    };
+    const next = [entry, ...savedSearches].slice(0, 10);
+    setSavedSearches(next);
+    lsWrite(SAVED_KEY, next);
+    showToast('Search saved', 'success');
+  };
+
+  const applySaved = (s) => {
+    setSortBy(s.sortBy);
+    setMinimumRating(s.minimumRating);
+    setSkillFilter(s.skillFilter);
+    showToast('Saved search applied', 'info');
+  };
+
+  const removeSaved = (id) => {
+    const next = savedSearches.filter((s) => s.id !== id);
+    setSavedSearches(next);
+    lsWrite(SAVED_KEY, next);
+  };
+
+  const passWithUndo = (id) => {
+    setPassedIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+    const toastEl = document.createElement('div');
+    toastEl.className = 'scout-toast scout-toast--info';
+    toastEl.innerHTML = `<span>Passed — </span><button style="background:none;border:none;color:#fff;font-weight:700;cursor:pointer;text-decoration:underline">Undo</button>`;
+    toastEl.querySelector('button').addEventListener('click', () => {
+      setPassedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      toastEl.remove();
+    });
+    document.body.appendChild(toastEl);
+    setTimeout(() => toastEl.remove(), 3200);
+  };
+
+  const toggleCompare = (id) => {
+    setCompareIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else {
+        if (next.size >= 3) return prev;
+        next.add(id);
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     const fn = () => setRepBump((x) => x + 1);
@@ -91,15 +167,19 @@ export default function MatchResults() {
     return list;
   }, [withReputation, sortBy]);
 
-  const visible = sorted.filter((m) => !passedIds.has(m.id));
+  const visible = sorted
+    .filter((m) => !passedIds.has(m.id))
+    .filter((m) => (m.reputation?.rating ?? 0) >= minimumRating)
+    .filter((m) => (skillFilter === 'all' ? true : (m.primarySkill ?? '').toLowerCase().includes(skillFilter.toLowerCase())));
+  const paginated = visible.slice(0, visibleCount);
   const count = visible.length;
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
       <div style={{ padding: '24px 24px 0', flexShrink: 0 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 6px', letterSpacing: '-0.02em' }}>Your matches</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 6px', letterSpacing: '-0.02em' }}>{t('matches.title')}</h1>
         <p style={{ fontSize: 14, color: 'var(--color-text-2)', margin: 0 }}>
-          {count === 0 ? 'No matches yet' : `${count} ${count === 1 ? 'match' : 'matches'} found`}
+          {count === 0 ? t('matches.none') : t('matches.countFound', { count })}
         </p>
 
         {count > 0 ? (
@@ -112,7 +192,7 @@ export default function MatchResults() {
               marginTop: 18,
             }}
           >
-            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-3)' }}>Sort by</span>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-3)' }}>{t('matches.sortBy')}</span>
             {SORTS.map((s) => (
               <button
                 key={s.id}
@@ -130,8 +210,85 @@ export default function MatchResults() {
                   fontFamily: 'var(--font-sans)',
                 }}
               >
-                {s.label}
+                {t(s.labelKey)}
               </button>
+            ))}
+            <label style={{ fontSize: 12, color: 'var(--color-text-3)', marginLeft: 8 }}>
+              {t('matches.minRating')}
+              <select
+                value={minimumRating}
+                onChange={(e) => setMinimumRating(Number(e.target.value))}
+                aria-label={t('matches.minRating')}
+                style={{ marginLeft: 8, borderRadius: 8, border: '1px solid var(--color-border)', padding: '5px 8px' }}
+              >
+                <option value={0}>{t('matches.any')}</option>
+                <option value={3}>3.0+</option>
+                <option value={4}>4.0+</option>
+                <option value={4.5}>4.5+</option>
+              </select>
+            </label>
+            <label style={{ fontSize: 12, color: 'var(--color-text-3)' }}>
+              {t('matches.skill')}
+              <input
+                value={skillFilter === 'all' ? '' : skillFilter}
+                onChange={(e) => setSkillFilter(e.target.value || 'all')}
+                placeholder={t('matches.skillPlaceholder')}
+                aria-label={t('matches.skill')}
+                style={{ marginLeft: 8, borderRadius: 8, border: '1px solid var(--color-border)', padding: '5px 8px' }}
+              />
+            </label>
+            <button
+              type="button"
+              onClick={saveCurrentSearch}
+              style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-surface)', fontWeight: 600, fontSize: 12, cursor: 'pointer', color: 'var(--color-text-2)' }}
+            >
+              Save search
+            </button>
+            {compareIds.size >= 2 ? (
+              <button
+                type="button"
+                onClick={() => setCompareOpen(true)}
+                style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--color-primary)', background: 'var(--color-primary)', color: '#fff', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}
+              >
+                Compare {compareIds.size}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+
+        {savedSearches.length > 0 ? (
+          <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 11, color: 'var(--color-text-3)', alignSelf: 'center' }}>Saved:</span>
+            {savedSearches.map((s) => (
+              <span
+                key={s.id}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  fontSize: 11,
+                  padding: '3px 8px',
+                  borderRadius: 999,
+                  background: 'var(--color-surface-2)',
+                  border: '1px solid var(--color-border)',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => applySaved(s)}
+                  style={{ border: 'none', background: 'none', fontSize: 11, cursor: 'pointer', color: 'var(--color-text-2)' }}
+                >
+                  {s.name || 'Saved search'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeSaved(s.id)}
+                  aria-label="Remove saved search"
+                  style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--color-text-3)' }}
+                >
+                  ×
+                </button>
+              </span>
             ))}
           </div>
         ) : null}
@@ -152,10 +309,10 @@ export default function MatchResults() {
           >
             <EmptyMatchesIllustration />
             <p style={{ fontSize: 15, fontWeight: 600, margin: '0 0 8px', color: 'var(--color-text)' }}>
-              We&apos;re still building your matches — check back soon
+              {t('matches.buildingTitle')}
             </p>
             <p style={{ fontSize: 13, color: 'var(--color-text-3)', margin: '0 0 20px', maxWidth: 320, lineHeight: 1.5 }}>
-              When we find people who fit your skills and preferences, they&apos;ll show up here.
+              {t('matches.buildingBody')}
             </p>
             <button
               type="button"
@@ -172,44 +329,108 @@ export default function MatchResults() {
                 fontFamily: 'var(--font-sans)',
               }}
             >
-              Go to Dashboard
+              {t('matches.goToDashboard')}
             </button>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 560 }}>
-            {visible.map((match) => (
-              <MatchCard
-                key={match.id}
-                match={match}
-                interestSent={interestIds.has(match.id)}
-                passed={passedIds.has(match.id)}
-                onInterested={() => {
-                  setInterestIds((prev) => new Set(prev).add(match.id));
-                  navigate('/matches/confirm', {
-                    state: {
-                      projectName: match.projectName,
-                      projectSummary: match.projectSummary,
-                      me: { name: user?.name ?? 'You', avatarUrl: user?.avatar_url ?? null },
-                      other: {
-                        name: match.name,
-                        avatarUrl: match.avatarUrl ?? null,
-                        role: match.role,
+            {paginated.map((match) => (
+              <div key={match.id} style={{ position: 'relative' }}>
+                <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 1, display: 'flex', gap: 6 }}>
+                  <label
+                    style={{
+                      fontSize: 11,
+                      color: 'var(--color-text-3)',
+                      background: 'var(--color-surface)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: 8,
+                      padding: '3px 8px',
+                      display: 'inline-flex',
+                      gap: 4,
+                      alignItems: 'center',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={compareIds.has(match.id)}
+                      onChange={() => toggleCompare(match.id)}
+                      disabled={!compareIds.has(match.id) && compareIds.size >= 3}
+                      style={{ margin: 0 }}
+                    />
+                    Compare
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setWhyMatch(match)}
+                    style={{
+                      fontSize: 11,
+                      color: 'var(--color-primary)',
+                      background: 'var(--color-surface)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: 8,
+                      padding: '3px 8px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Why this match?
+                  </button>
+                </div>
+                <MatchCard
+                  match={match}
+                  interestSent={interestIds.has(match.id)}
+                  passed={passedIds.has(match.id)}
+                  onInterested={() => {
+                    setInterestIds((prev) => new Set(prev).add(match.id));
+                    navigate('/matches/confirm', {
+                      state: {
+                        projectName: match.projectName,
+                        projectSummary: match.projectSummary,
+                        me: { name: user?.name ?? 'You', avatarUrl: user?.avatar_url ?? null },
+                        other: {
+                          name: match.name,
+                          avatarUrl: match.avatarUrl ?? null,
+                          role: match.role,
+                        },
                       },
-                    },
-                  });
-                }}
-                onPass={() => {
-                  setPassedIds((prev) => new Set(prev).add(match.id));
-                }}
-                onViewProfile={() => {
-                  navigate(`/profile/${match.username || match.id}`);
-                }}
-                viewerRole={user?.role}
-              />
+                    });
+                  }}
+                  onPass={() => passWithUndo(match.id)}
+                  onViewProfile={() => {
+                    navigate(`/profile/${match.username || match.id}`);
+                  }}
+                  viewerRole={user?.role}
+                />
+              </div>
             ))}
+            {visible.length > paginated.length ? (
+              <button
+                type="button"
+                onClick={() => setVisibleCount((prev) => prev + 8)}
+                style={{
+                  width: '100%',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 10,
+                  background: 'var(--color-surface)',
+                  color: 'var(--color-text)',
+                  padding: '10px 12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                {t('matches.loadMore')}
+              </button>
+            ) : null}
           </div>
         )}
       </div>
+      {compareOpen ? (
+        <MatchCompareModal
+          matches={sorted.filter((m) => compareIds.has(m.id))}
+          onClose={() => setCompareOpen(false)}
+        />
+      ) : null}
+      {whyMatch ? <WhyThisMatchDrawer match={whyMatch} onClose={() => setWhyMatch(null)} /> : null}
     </div>
   );
 }

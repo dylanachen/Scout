@@ -480,6 +480,7 @@ export default function OnboardingChatScreen({
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={onKeyDown}
+                aria-label="Onboarding response"
                 placeholder={
                   current.placeholder
                     ? current.placeholder

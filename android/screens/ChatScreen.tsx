@@ -12,6 +12,9 @@ import {
   Alert,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
+import { useTranslation } from 'react-i18next';
 import { api } from '../api/client';
 import { isDemoMode, shouldUseDemoAdapter } from '../api/demoAdapter';
 import ScopeAlert, { type ScopeAlertPayload } from '../components/ScopeAlert';
@@ -92,12 +95,12 @@ const DEMO_CHAT_SEED = (): Msg[] => [
 ];
 
 const MENU_ITEMS = [
-  'View Contract',
-  'Pull Scope Drift Report',
-  'View Decision Log',
-  'Invite Stakeholder',
-  'Project Settings',
-  'Archive Project',
+  { id: 'view_contract', labelKey: 'chat.menu.viewContract' },
+  { id: 'scope_drift_report', labelKey: 'chat.menu.scopeDriftReport' },
+  { id: 'decision_log', labelKey: 'chat.menu.decisionLog' },
+  { id: 'invite_stakeholder', labelKey: 'chat.menu.inviteStakeholder' },
+  { id: 'project_settings', labelKey: 'chat.menu.projectSettings' },
+  { id: 'archive_project', labelKey: 'chat.menu.archiveProject' },
 ];
 
 function formatMsgDate(ts?: string) {
@@ -174,8 +177,9 @@ type Props = {
 };
 
 export default function ChatScreen({ navigation, route }: Props) {
+  const { t } = useTranslation();
   const params = route?.params as { projectName?: string; projectId?: string } | undefined;
-  const projectName = params?.projectName || 'Project Chat';
+  const projectName = params?.projectName || t('chat.projectChat');
 
   const [projectId, setProjectId] = useState<string | null>(params?.projectId || null);
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -273,6 +277,33 @@ export default function ChatScreen({ navigation, route }: Props) {
   /* ── actions ── */
   const dismissAlert = (id: string) => setScopeAlerts((prev) => prev.filter((a) => a.id !== id));
 
+  const pickAttachment = async () => {
+    Alert.alert(t('chat.addAttachment'), t('chat.chooseSource'), [
+      {
+        text: t('chat.photoLibrary'),
+        onPress: async () => {
+          const res = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'],
+            quality: 0.7,
+          });
+          if (!res.canceled) {
+            Alert.alert(t('chat.attachmentSelected'), t('chat.uploadLater'));
+          }
+        },
+      },
+      {
+        text: t('chat.document'),
+        onPress: async () => {
+          const result = await DocumentPicker.getDocumentAsync({});
+          if (!result.canceled) {
+            Alert.alert(t('chat.attachmentSelected'), t('chat.uploadLater'));
+          }
+        },
+      },
+      { text: t('common.cancel'), style: 'cancel' },
+    ]);
+  };
+
   const send = () => {
     const t = input.trim();
     if (!t) return;
@@ -296,28 +327,28 @@ export default function ChatScreen({ navigation, route }: Props) {
     setInput('');
   };
 
-  const handleMenuItem = (label: string) => {
+  const handleMenuItem = (id: string) => {
     setMenuOpen(false);
-    switch (label) {
-      case 'View Contract':
+    switch (id) {
+      case 'view_contract':
         navigation?.navigate('Projects', { highlightContract: projectId });
         break;
-      case 'Pull Scope Drift Report':
+      case 'scope_drift_report':
         navigation?.navigate('Projects', { showScopeDrift: projectId });
         break;
-      case 'View Decision Log':
-        Alert.alert('Decision Log', 'The full decision log will be available in an upcoming update.');
+      case 'decision_log':
+        Alert.alert(t('chat.alerts.decisionLogTitle'), t('chat.alerts.decisionLogMessage'));
         break;
-      case 'Invite Stakeholder':
-        Alert.alert('Invite Stakeholder', 'Stakeholder invitations will be available in an upcoming update.');
+      case 'invite_stakeholder':
+        Alert.alert(t('chat.alerts.inviteTitle'), t('chat.alerts.inviteMessage'));
         break;
-      case 'Project Settings':
+      case 'project_settings':
         navigation?.navigate('Settings');
         break;
-      case 'Archive Project':
-        Alert.alert('Archive Project', 'Are you sure you want to archive this project? You can restore it later.', [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Archive', style: 'destructive', onPress: () => navigation?.navigate('Projects') },
+      case 'archive_project':
+        Alert.alert(t('chat.alerts.archiveTitle'), t('chat.alerts.archiveMessage'), [
+          { text: t('common.cancel'), style: 'cancel' },
+          { text: t('chat.alerts.archiveAction'), style: 'destructive', onPress: () => navigation?.navigate('Projects') },
         ]);
         break;
       default:
@@ -334,9 +365,9 @@ export default function ChatScreen({ navigation, route }: Props) {
   if (!projectId) {
     return (
       <View style={styles.emptyWrap}>
-        <Text style={styles.muted}>No projects loaded.</Text>
+        <Text style={styles.muted}>{t('chat.noProjects')}</Text>
         <Text style={[styles.muted, { marginTop: 10 }]}>
-          {demoActive ? 'Try signing in again.' : 'Start FastAPI or enable EXPO_PUBLIC_DEMO_MODE=true.'}
+          {demoActive ? t('chat.trySignInAgain') : t('chat.startApi')}
         </Text>
       </View>
     );
@@ -356,7 +387,7 @@ export default function ChatScreen({ navigation, route }: Props) {
           <View style={styles.headerSub}>
             <Text style={styles.headerParticipant}>Jordan Kim</Text>
             <View style={styles.statusBadge}>
-              <Text style={styles.statusBadgeText}>In Progress</Text>
+              <Text style={styles.statusBadgeText}>{t('chat.inProgress')}</Text>
             </View>
           </View>
         </View>
@@ -374,9 +405,9 @@ export default function ChatScreen({ navigation, route }: Props) {
       <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
         <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setMenuOpen(false)}>
           <View style={styles.menuCard}>
-            {MENU_ITEMS.map((label) => (
-              <TouchableOpacity key={label} style={styles.menuItem} onPress={() => handleMenuItem(label)}>
-                <Text style={styles.menuItemText}>{label}</Text>
+            {MENU_ITEMS.map((item) => (
+              <TouchableOpacity key={item.id} style={styles.menuItem} onPress={() => handleMenuItem(item.id)}>
+                <Text style={styles.menuItemText}>{t(item.labelKey)}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -388,7 +419,7 @@ export default function ChatScreen({ navigation, route }: Props) {
         {/* Catch-up banner */}
         {showCatchUp && (
           <View style={styles.catchUp}>
-            <Text style={styles.catchUpTitle}>{"Here\u2019s what you missed \ud83d\udc4b"}</Text>
+            <Text style={styles.catchUpTitle}>{`${t('chat.missed')} 👋`}</Text>
             {unreadFromOthers.map((m) => (
               <Text key={m.id} style={styles.catchUpBullet}>
                 {'\u2022 '}
@@ -397,12 +428,12 @@ export default function ChatScreen({ navigation, route }: Props) {
               </Text>
             ))}
             <TouchableOpacity style={styles.catchUpBtn} onPress={() => setCatchUpDismissed(true)}>
-              <Text style={styles.catchUpBtnText}>Got it</Text>
+              <Text style={styles.catchUpBtnText}>{t('chat.gotIt')}</Text>
             </TouchableOpacity>
           </View>
         )}
 
-        {messages.length === 0 && <Text style={styles.muted}>No messages yet.</Text>}
+        {messages.length === 0 && <Text style={styles.muted}>{t('chat.noMessages')}</Text>}
 
         {messages.map((msg, i) => {
           const prev = i > 0 ? messages[i - 1] : undefined;
@@ -429,7 +460,7 @@ export default function ChatScreen({ navigation, route }: Props) {
                 <View style={styles.aiPrivateCard}>
                   <View style={styles.aiPrivateHeader}>
                     <Text style={styles.aiPrivateLock}>{'\u{1F512}'}</Text>
-                    <Text style={styles.aiPrivateLabel}>Only you can see this</Text>
+                    <Text style={styles.aiPrivateLabel}>{t('chat.onlyYou')}</Text>
                   </View>
                   <Text style={styles.aiPrivateText}>{msg.text}</Text>
                 </View>
@@ -511,7 +542,7 @@ export default function ChatScreen({ navigation, route }: Props) {
 
       {/* ── Input row ── */}
       <View style={styles.inputRow}>
-        <TouchableOpacity style={styles.attachBtn} hitSlop={8}>
+        <TouchableOpacity style={styles.attachBtn} hitSlop={8} onPress={pickAttachment} accessibilityRole="button" accessibilityLabel="Add attachment" accessibilityHint="Opens image or document picker">
           <View style={{ transform: [{ rotate: '-45deg' }] }}>
             <Text style={{ fontSize: 20, color: '#9aa0ae' }}>{'\u{1F4CE}'}</Text>
           </View>
@@ -520,7 +551,7 @@ export default function ChatScreen({ navigation, route }: Props) {
           style={styles.input}
           value={input}
           onChangeText={setInput}
-          placeholder={'Message\u2026'}
+          placeholder={t('chat.messagePlaceholder')}
           placeholderTextColor="#9aa0ae"
           multiline
           numberOfLines={4}

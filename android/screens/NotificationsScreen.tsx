@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,10 @@ import { useNavigation } from '@react-navigation/native';
 import { api } from '../api/client';
 import useDemoActive from '../hooks/useDemoActive';
 import FilterPillTabs, { type FilterPillTab } from '../components/FilterPillTabs';
+import EmptyState from '../components/states/EmptyState';
+import Skeleton from '../components/states/Skeleton';
+import ErrorState from '../components/states/ErrorState';
+import { useTranslation } from 'react-i18next';
 
 type NotifType =
   | 'match'
@@ -80,30 +84,40 @@ function NotifIcon({ type }: { type: NotifType }) {
 }
 
 export default function NotificationsScreen() {
+  const { t } = useTranslation();
   const navigation = useNavigation<any>();
   const demoActive = useDemoActive();
   const [activeTab, setActiveTab] = useState<NotifFilterTab>('All');
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  useEffect(() => {
+  const fetchNotifications = useCallback(async () => {
+    setError('');
     if (demoActive) {
       setNotifications(DEMO_NOTIFICATIONS);
+      setLoading(false);
       return;
     }
-    let cancelled = false;
-    (async () => {
-      try {
-        const { data } = await api.get('/notifications');
-        if (!cancelled && Array.isArray(data)) setNotifications(data);
-      } catch { /* backend unavailable */ }
-    })();
-    return () => { cancelled = true; };
+    try {
+      const { data } = await api.get('/notifications');
+      if (Array.isArray(data)) setNotifications(data);
+    } catch {
+      setError('Failed to load notifications');
+    } finally {
+      setLoading(false);
+    }
   }, [demoActive]);
+
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
   const [refreshing, setRefreshing] = useState(false);
 
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
+    await fetchNotifications();
+    setRefreshing(false);
   };
 
   const filtered = notifications.filter((n) => {
@@ -148,9 +162,9 @@ export default function NotificationsScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.heading}>Notifications</Text>
-        <TouchableOpacity onPress={markAllRead}>
-          <Text style={styles.markAll}>Mark all as read</Text>
+        <Text style={styles.heading}>{t('notifications.title')}</Text>
+        <TouchableOpacity onPress={markAllRead} accessibilityRole="button" accessibilityLabel={t('notifications.markAllRead')}>
+          <Text style={styles.markAll}>{t('notifications.markAllRead')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -160,17 +174,27 @@ export default function NotificationsScreen() {
         contentContainerStyle={styles.list}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        {filtered.length === 0 ? (
-          <View style={styles.emptyState}>
-            <View style={styles.emptyIconWrap}>
-              <Text style={{ fontSize: 24, color: '#9aa0ae' }}>{'\u2714'}</Text>
-            </View>
-            <Text style={styles.emptyTitle}>No notifications</Text>
-            <Text style={styles.emptyDesc}>You're all caught up!</Text>
+        {loading ? (
+          <View style={{ gap: 8, marginBottom: 8 }}>
+            <Skeleton height={58} />
+            <Skeleton height={58} />
+            <Skeleton height={58} />
           </View>
+        ) : null}
+        {error ? <ErrorState message={error} onRetry={() => void fetchNotifications()} /> : null}
+        {filtered.length === 0 && !loading ? (
+          <EmptyState title={t('notifications.empty')} subtitle={t('notifications.caughtUp')} />
         ) : (
           filtered.map((n) => (
-            <TouchableOpacity key={n.id} style={styles.notifRow} onPress={() => handlePress(n)} activeOpacity={0.7}>
+            <TouchableOpacity
+              key={n.id}
+              style={styles.notifRow}
+              onPress={() => handlePress(n)}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={n.title}
+              accessibilityHint="Open related screen and mark notification as read"
+            >
               {!n.read && <View style={styles.unreadDot} />}
               <NotifIcon type={n.type} />
               <View style={styles.notifContent}>
@@ -234,16 +258,4 @@ const styles = StyleSheet.create({
   notifDesc: { fontSize: 12, color: '#9aa0ae', lineHeight: 17 },
   notifTime: { fontSize: 11, color: '#9aa0ae' },
 
-  emptyState: { alignItems: 'center', paddingTop: 60 },
-  emptyIconWrap: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#f1f5f9',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  emptyTitle: { fontSize: 16, fontWeight: '600', color: '#0f1623', marginBottom: 4 },
-  emptyDesc: { fontSize: 13, color: '#9aa0ae' },
 });

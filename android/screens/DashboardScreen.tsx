@@ -1,17 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api/client';
 import useDemoActive from '../hooks/useDemoActive';
 
 /* ── Helpers ───────────────────────────────────────────── */
 
-function getGreeting() {
+function getGreeting(t: (key: string) => string) {
   const h = new Date().getHours();
-  if (h < 12) return 'Good morning';
-  if (h < 18) return 'Good afternoon';
-  return 'Good evening';
+  if (h < 12) return t('dashboard.greetingMorning');
+  if (h < 18) return t('dashboard.greetingAfternoon');
+  return t('dashboard.greetingEvening');
 }
 
 function formatDate() {
@@ -21,10 +22,10 @@ function formatDate() {
 /* ── Demo data ─────────────────────────────────────────── */
 
 const METRICS = [
-  { label: 'Active Projects', value: '2', bg: '#dbeafe', accent: '#1d6ecd', icon: '\u25C6' },
-  { label: 'Hours This Week', value: '24.5', bg: '#dcfce7', accent: '#16a34a', icon: '\u25F7' },
-  { label: 'Pending Invoices', value: '1', bg: '#fef3c7', accent: '#16a34a', icon: '$' },
-  { label: 'Unread Messages', value: '3', bg: '#fce7f3', accent: '#db2777', icon: 'M' },
+  { key: 'active_projects', labelKey: 'dashboard.activeProjects', value: '2', bg: '#dbeafe', accent: '#1d6ecd', icon: '\u25C6' },
+  { key: 'hours_week', labelKey: 'dashboard.hoursThisWeek', value: '24.5', bg: '#dcfce7', accent: '#16a34a', icon: '\u25F7' },
+  { key: 'pending_invoices', labelKey: 'dashboard.pendingInvoices', value: '1', bg: '#fef3c7', accent: '#16a34a', icon: '$' },
+  { key: 'unread_messages', labelKey: 'dashboard.unreadMessages', value: '3', bg: '#fce7f3', accent: '#db2777', icon: 'M' },
 ];
 
 const DEMO_PROJECTS = [
@@ -56,8 +57,8 @@ const ACTIVITY_ICONS: Record<string, { bg: string; icon: string; color: string }
 
 /* ── Components ────────────────────────────────────────── */
 
-function MetricCard({ label, value, bg, accent, icon }: typeof METRICS[0]) {
-  const isInvoice = label === 'Pending Invoices';
+function MetricCard({ label, value, bg, accent, icon }: { label: string; value: string; bg: string; accent: string; icon: string }) {
+  const isInvoice = icon === '$';
   return (
     <View style={[styles.metric, { backgroundColor: bg }]}>
       <View style={[styles.metricIcon, { backgroundColor: accent }]}>
@@ -72,12 +73,20 @@ function MetricCard({ label, value, bg, accent, icon }: typeof METRICS[0]) {
   );
 }
 
-function ProjectCard({ project, onPress }: { project: typeof DEMO_PROJECTS[0]; onPress: () => void }) {
+function ProjectCard({
+  project,
+  onPress,
+  t,
+}: {
+  project: typeof DEMO_PROJECTS[0];
+  onPress: () => void;
+  t: (key: string) => string;
+}) {
   const STATUS_MAP: Record<string, { bg: string; color: string; label: string }> = {
-    in_progress: { bg: '#dbeafe', color: '#1d6ecd', label: 'In Progress' },
-    pending_match: { bg: '#eff6ff', color: '#1d6ecd', label: 'Pending Match' },
-    completed: { bg: '#dcfce7', color: '#16a34a', label: 'Completed' },
-    overdue: { bg: '#fef2f2', color: '#dc2626', label: 'Overdue' },
+    in_progress: { bg: '#dbeafe', color: '#1d6ecd', label: t('dashboard.inProgress') },
+    pending_match: { bg: '#eff6ff', color: '#1d6ecd', label: t('dashboard.pendingMatch') },
+    completed: { bg: '#dcfce7', color: '#16a34a', label: t('dashboard.completed') },
+    overdue: { bg: '#fef2f2', color: '#dc2626', label: t('dashboard.overdue') },
   };
   const st = STATUS_MAP[project.status] ?? STATUS_MAP.in_progress;
   const daysLeft = project.deadline ? Math.ceil((new Date(project.deadline).getTime() - Date.now()) / 86400000) : null;
@@ -110,7 +119,7 @@ function ProjectCard({ project, onPress }: { project: typeof DEMO_PROJECTS[0]; o
         activeOpacity={0.8}
         onPress={onPress}
       >
-        <Text style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}>Open Chat</Text>
+        <Text style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}>{t('dashboard.openChat')}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -151,6 +160,7 @@ function MatchPreview({ match }: { match: typeof DEMO_MATCHES[0] }) {
 /* ── Screen ────────────────────────────────────────────── */
 
 export default function DashboardScreen() {
+  const { t } = useTranslation();
   const navigation = useNavigation<any>();
   const { user } = useAuth();
   const demoActive = useDemoActive();
@@ -179,10 +189,10 @@ export default function DashboardScreen() {
         if (data.notifications) setActivity(data.notifications.map((n: any) => ({ id: n.id, text: n.text, time: n.at, type: 'message' })));
         if (data.stats) {
           setMetrics([
-            { label: 'Active Projects', value: String(data.stats.active_projects ?? 0), bg: '#dbeafe', accent: '#1d6ecd', icon: '\u25C6' },
-            { label: 'Hours This Week', value: String(data.stats.hours_logged_week ?? 0), bg: '#dcfce7', accent: '#16a34a', icon: '\u25F7' },
-            { label: 'Pending Invoices', value: String(data.stats.pending_invoices_count ?? 0), bg: '#fef3c7', accent: '#16a34a', icon: '$' },
-            { label: 'Unread Messages', value: String(data.stats.unread_messages ?? 0), bg: '#fce7f3', accent: '#db2777', icon: 'M' },
+            { key: 'active_projects', labelKey: 'dashboard.activeProjects', value: String(data.stats.active_projects ?? 0), bg: '#dbeafe', accent: '#1d6ecd', icon: '\u25C6' },
+            { key: 'hours_week', labelKey: 'dashboard.hoursThisWeek', value: String(data.stats.hours_logged_week ?? 0), bg: '#dcfce7', accent: '#16a34a', icon: '\u25F7' },
+            { key: 'pending_invoices', labelKey: 'dashboard.pendingInvoices', value: String(data.stats.pending_invoices_count ?? 0), bg: '#fef3c7', accent: '#16a34a', icon: '$' },
+            { key: 'unread_messages', labelKey: 'dashboard.unreadMessages', value: String(data.stats.unread_messages ?? 0), bg: '#fce7f3', accent: '#db2777', icon: 'M' },
           ]);
         }
       } catch { /* backend unavailable */ }
@@ -190,15 +200,15 @@ export default function DashboardScreen() {
     return () => { cancelled = true; };
   }, [demoActive]);
 
-  const handleMetricPress = (label: string) => {
-    switch (label) {
-      case 'Active Projects':
+  const handleMetricPress = (key: string) => {
+    switch (key) {
+      case 'active_projects':
         navigation.navigate('Projects');
         break;
-      case 'Pending Invoices':
+      case 'pending_invoices':
         navigation.navigate('Invoices');
         break;
-      case 'Unread Messages':
+      case 'unread_messages':
         navigation.navigate('Notifications');
         break;
       default:
@@ -211,7 +221,7 @@ export default function DashboardScreen() {
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content}>
         {/* Greeting */}
         <Text style={styles.greeting}>
-          {getGreeting()}, {firstName} {'\u{1F44B}'}
+          {getGreeting(t)}, {firstName} {'\u{1F44B}'}
         </Text>
         <Text style={styles.date}>{formatDate()}</Text>
 
@@ -219,21 +229,21 @@ export default function DashboardScreen() {
         <View style={styles.metricsGrid}>
           {metrics.map((m) => (
             <TouchableOpacity
-              key={m.label}
+              key={m.key}
               activeOpacity={0.7}
-              onPress={() => handleMetricPress(m.label)}
+              onPress={() => handleMetricPress(m.key)}
               style={{ width: '48%', flexGrow: 1, minWidth: 150 }}
             >
-              <MetricCard {...m} />
+              <MetricCard label={t(m.labelKey)} value={m.value} bg={m.bg} accent={m.accent} icon={m.icon} />
             </TouchableOpacity>
           ))}
         </View>
 
         {/* Active projects */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Active Projects</Text>
+          <Text style={styles.sectionTitle}>{t('dashboard.activeProjects')}</Text>
           <TouchableOpacity onPress={() => navigation.navigate('Projects')}>
-            <Text style={styles.seeAll}>View all</Text>
+            <Text style={styles.seeAll}>{t('dashboard.viewAll')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -243,14 +253,15 @@ export default function DashboardScreen() {
               <ProjectCard
                 key={p.id}
                 project={p}
+                t={t}
                 onPress={() => navigation.navigate('ProjectChat', { projectId: p.id, projectName: p.name })}
               />
             ))}
           </ScrollView>
         ) : (
           <View style={styles.emptyProjects}>
-            <Text style={styles.emptyTitle}>No active projects</Text>
-            <Text style={styles.emptyDesc}>When you start a project, it will appear here.</Text>
+            <Text style={styles.emptyTitle}>{t('dashboard.noActiveProjects')}</Text>
+            <Text style={styles.emptyDesc}>{t('dashboard.noActiveProjectsDesc')}</Text>
             <TouchableOpacity
               style={styles.emptyAddBtn}
               onPress={() => navigation.navigate('Onboarding')}
@@ -267,7 +278,7 @@ export default function DashboardScreen() {
           onPress={() => setMatchesExpanded(!matchesExpanded)}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Text style={styles.sectionTitle}>Pending Matches</Text>
+            <Text style={styles.sectionTitle}>{t('dashboard.pendingMatches')}</Text>
             <View style={styles.matchCountBadge}>
               <Text style={styles.matchCountText}>{matches.length}</Text>
             </View>
@@ -286,7 +297,7 @@ export default function DashboardScreen() {
         )}
 
         {/* Recent activity */}
-        <Text style={[styles.sectionTitle, { marginTop: 24, marginBottom: 12 }]}>Recent Activity</Text>
+        <Text style={[styles.sectionTitle, { marginTop: 24, marginBottom: 12 }]}>{t('dashboard.recentActivity')}</Text>
         {activity.map((a) => (
           <ActivityRow key={a.id} item={a} />
         ))}
@@ -295,7 +306,7 @@ export default function DashboardScreen() {
           style={styles.viewAllNotifs}
           onPress={() => navigation.navigate('Notifications')}
         >
-          <Text style={styles.viewAllNotifsText}>View all notifications</Text>
+          <Text style={styles.viewAllNotifsText}>{t('dashboard.viewAllNotifications')}</Text>
         </TouchableOpacity>
 
         {/* Start a New Project button */}
@@ -304,7 +315,7 @@ export default function DashboardScreen() {
           activeOpacity={0.8}
           onPress={() => navigation.navigate('Onboarding')}
         >
-          <Text style={styles.newProjectBtnText}>Start a New Project</Text>
+          <Text style={styles.newProjectBtnText}>{t('dashboard.startProject')}</Text>
         </TouchableOpacity>
       </ScrollView>
 

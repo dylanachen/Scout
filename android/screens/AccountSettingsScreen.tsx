@@ -17,6 +17,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import { useTranslation } from 'react-i18next';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { authApi, type MeUser } from '../api/client';
 import { useAuth } from '../context/AuthContext';
@@ -47,6 +48,7 @@ function validEmail(s: string) {
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function AccountSettingsScreen({ navigation, onSignedOut }: Props) {
+  const { t } = useTranslation();
   const { signOut } = useAuth();
 
   const [user, setUser] = useState<MeUser | null>(null);
@@ -120,11 +122,11 @@ export default function AccountSettingsScreen({ navigation, onSignedOut }: Props
 
   const blurName = () => {
     setNameTouched(true);
-    setNameError(!name.trim() ? 'Enter your name.' : '');
+    setNameError(!name.trim() ? t('misc.accountSettings.errors.enterName') : '');
   };
   const blurEmail = () => {
     setEmailTouched(true);
-    setEmailError(!email.trim() ? 'Enter your email.' : !validEmail(email) ? 'Enter a valid email.' : '');
+    setEmailError(!email.trim() ? t('misc.accountSettings.errors.enterEmail') : !validEmail(email) ? t('misc.accountSettings.errors.validEmail') : '');
   };
 
   const pickPhoto = async () => {
@@ -147,8 +149,8 @@ export default function AccountSettingsScreen({ navigation, onSignedOut }: Props
     setSaveError('');
     blurName();
     blurEmail();
-    const ne = !name.trim() ? 'Enter your name.' : '';
-    const ee = !email.trim() ? 'Enter your email.' : !validEmail(email) ? 'Enter a valid email.' : '';
+    const ne = !name.trim() ? t('misc.accountSettings.errors.enterName') : '';
+    const ee = !email.trim() ? t('misc.accountSettings.errors.enterEmail') : !validEmail(email) ? t('misc.accountSettings.errors.validEmail') : '';
     setNameError(ne);
     setEmailError(ee);
     if (ne || ee) return;
@@ -159,7 +161,7 @@ export default function AccountSettingsScreen({ navigation, onSignedOut }: Props
       setUser(data);
       baseline.current = { name: name.trim(), email: email.trim(), avatar: avatarUri };
     } catch (err) {
-      setSaveError(formatAuthError(err) ?? 'Could not save changes.');
+      setSaveError(formatAuthError(err) ?? t('misc.accountSettings.errors.saveChanges'));
     } finally {
       setSaveLoading(false);
     }
@@ -168,15 +170,15 @@ export default function AccountSettingsScreen({ navigation, onSignedOut }: Props
   const submitPw = async () => {
     setPwError('');
     setPwOk('');
-    if (newPw.length < 8) { setPwError('New password must be at least 8 characters.'); return; }
-    if (newPw !== confPw) { setPwError('New passwords do not match.'); return; }
+    if (newPw.length < 8) { setPwError(t('misc.accountSettings.errors.passwordLength')); return; }
+    if (newPw !== confPw) { setPwError(t('misc.accountSettings.errors.passwordMismatch')); return; }
     setPwLoading(true);
     try {
       await authApi.changePassword({ current_password: curPw, new_password: newPw });
       setCurPw(''); setNewPw(''); setConfPw('');
-      setPwOk('Password updated.');
+      setPwOk(t('misc.accountSettings.passwordUpdated'));
     } catch (err) {
-      setPwError(formatAuthError(err) ?? 'Could not update password.');
+      setPwError(formatAuthError(err) ?? t('misc.accountSettings.errors.passwordUpdate'));
     } finally {
       setPwLoading(false);
     }
@@ -205,9 +207,9 @@ export default function AccountSettingsScreen({ navigation, onSignedOut }: Props
   if (!user) {
     return (
       <View style={styles.center}>
-        <Text style={styles.muted}>Could not load account.</Text>
+        <Text style={styles.muted}>{t('misc.accountSettings.errors.loadAccount')}</Text>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.link}>Go back</Text>
+          <Text style={styles.link}>{t('misc.accountSettings.goBack')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -216,8 +218,8 @@ export default function AccountSettingsScreen({ navigation, onSignedOut }: Props
   return (
     <>
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-        <Text style={styles.h1}>Account Settings</Text>
-        <Text style={styles.muted}>Manage your profile and security.</Text>
+        <Text style={styles.h1}>{t('misc.accountSettings.title')}</Text>
+        <Text style={styles.muted}>{t('misc.accountSettings.subtitle')}</Text>
 
         <View style={{ alignItems: 'center', marginVertical: 20 }}>
           <TouchableOpacity onPress={pickPhoto} activeOpacity={0.85} style={styles.avatarWrap}>
@@ -234,7 +236,7 @@ export default function AccountSettingsScreen({ navigation, onSignedOut }: Props
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.label}>Full name</Text>
+        <Text style={styles.label}>{t('auth.fullName')}</Text>
         <TextInput
           style={[styles.input, nameTouched && nameError ? styles.inputErr : null]}
           value={name}
@@ -243,7 +245,7 @@ export default function AccountSettingsScreen({ navigation, onSignedOut }: Props
         />
         {nameTouched && nameError ? <Text style={styles.fieldErr}>{nameError}</Text> : null}
 
-        <Text style={styles.label}>Email</Text>
+        <Text style={styles.label}>{t('auth.email')}</Text>
         <TextInput
           style={[styles.input, emailTouched && emailError ? styles.inputErr : null]}
           autoCapitalize="none"
@@ -256,36 +258,36 @@ export default function AccountSettingsScreen({ navigation, onSignedOut }: Props
 
         <View style={styles.pwSection}>
           <TouchableOpacity style={styles.pwHeader} onPress={() => setExpandPw((x) => !x)} activeOpacity={0.85}>
-            <Text style={styles.pwHeaderText}>Change password</Text>
+            <Text style={styles.pwHeaderText}>{t('misc.accountSettings.changePassword')}</Text>
             <Text style={styles.chev}>{expandPw ? '\u25BE' : '\u25B8'}</Text>
           </TouchableOpacity>
           {expandPw ? (
             <View style={styles.pwBody}>
-              <Text style={styles.label}>Current password</Text>
+              <Text style={styles.label}>{t('misc.accountSettings.currentPassword')}</Text>
               <View style={styles.pwRow}>
                 <TextInput style={[styles.input, { flex: 1, marginBottom: 12 }]} secureTextEntry={!show1} value={curPw} onChangeText={setCurPw} />
                 <Pressable onPress={() => setShow1((s) => !s)} style={styles.showBtn}>
-                  <Text style={styles.showTxt}>{show1 ? 'Hide' : 'Show'}</Text>
+                  <Text style={styles.showTxt}>{show1 ? t('auth.hide') : t('auth.show')}</Text>
                 </Pressable>
               </View>
-              <Text style={styles.label}>New password</Text>
+              <Text style={styles.label}>{t('misc.accountSettings.newPassword')}</Text>
               <View style={styles.pwRow}>
                 <TextInput style={[styles.input, { flex: 1, marginBottom: 12 }]} secureTextEntry={!show2} value={newPw} onChangeText={setNewPw} />
                 <Pressable onPress={() => setShow2((s) => !s)} style={styles.showBtn}>
-                  <Text style={styles.showTxt}>{show2 ? 'Hide' : 'Show'}</Text>
+                  <Text style={styles.showTxt}>{show2 ? t('auth.hide') : t('auth.show')}</Text>
                 </Pressable>
               </View>
-              <Text style={styles.label}>Confirm new password</Text>
+              <Text style={styles.label}>{t('misc.accountSettings.confirmNewPassword')}</Text>
               <View style={styles.pwRow}>
                 <TextInput style={[styles.input, { flex: 1, marginBottom: 12 }]} secureTextEntry={!show3} value={confPw} onChangeText={setConfPw} />
                 <Pressable onPress={() => setShow3((s) => !s)} style={styles.showBtn}>
-                  <Text style={styles.showTxt}>{show3 ? 'Hide' : 'Show'}</Text>
+                  <Text style={styles.showTxt}>{show3 ? t('auth.hide') : t('auth.show')}</Text>
                 </Pressable>
               </View>
               {pwError ? <Text style={styles.fieldErr}>{pwError}</Text> : null}
               {pwOk ? <Text style={styles.ok}>{pwOk}</Text> : null}
               <TouchableOpacity style={styles.secondaryBtn} onPress={() => void submitPw()} disabled={pwLoading}>
-                <Text style={styles.secondaryBtnText}>{pwLoading ? 'Updating\u2026' : 'Update password'}</Text>
+                <Text style={styles.secondaryBtnText}>{pwLoading ? t('misc.accountSettings.updating') : t('misc.accountSettings.updatePassword')}</Text>
               </TouchableOpacity>
             </View>
           ) : null}
@@ -298,16 +300,16 @@ export default function AccountSettingsScreen({ navigation, onSignedOut }: Props
           onPress={saveProfile}
           disabled={!dirty || saveLoading}
         >
-          {saveLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Save Changes</Text>}
+          {saveLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>{t('misc.accountSettings.saveChanges')}</Text>}
         </TouchableOpacity>
 
         {/* Log Out button */}
         <TouchableOpacity style={styles.logoutBtn} onPress={() => void signOut()}>
-          <Text style={styles.logoutBtnText}>Log Out</Text>
+          <Text style={styles.logoutBtnText}>{t('misc.accountSettings.logOut')}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.deleteLink} onPress={openDeleteSheet}>
-          <Text style={styles.deleteLinkText}>Delete Account</Text>
+          <Text style={styles.deleteLinkText}>{t('misc.accountSettings.deleteAccount')}</Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -319,15 +321,15 @@ export default function AccountSettingsScreen({ navigation, onSignedOut }: Props
             onStartShouldSetResponder={() => true}
           >
             <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>Delete your account?</Text>
+            <Text style={styles.sheetTitle}>{t('misc.accountSettings.deleteTitle')}</Text>
             <Text style={styles.sheetBody}>
-              This will permanently delete your account and all project data. This cannot be undone.
+              {t('misc.accountSettings.deleteBody')}
             </Text>
             <TouchableOpacity style={styles.sheetDelBtn} onPress={confirmDelete} disabled={deleteLoading}>
-              <Text style={styles.sheetDelText}>{deleteLoading ? 'Deleting\u2026' : 'Yes, delete my account'}</Text>
+              <Text style={styles.sheetDelText}>{deleteLoading ? t('misc.accountSettings.deleting') : t('misc.accountSettings.confirmDelete')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.sheetCancelBtn} onPress={closeDeleteSheet}>
-              <Text style={styles.sheetCancelText}>Cancel</Text>
+              <Text style={styles.sheetCancelText}>{t('common.cancel')}</Text>
             </TouchableOpacity>
           </Animated.View>
         </Pressable>

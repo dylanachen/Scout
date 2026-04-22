@@ -9,18 +9,19 @@ import {
   Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 
 interface RatingRow {
   key: string;
-  label: string;
-  question: string;
+  labelKey: string;
+  questionKey: string;
 }
 
 const RATING_ROWS: RatingRow[] = [
-  { key: 'assets', label: 'Asset delivery', question: 'Did the client deliver assets on time and as expected?' },
-  { key: 'communication', label: 'Communication', question: 'Was the client responsive and clear in communication?' },
-  { key: 'scope', label: 'Scope respect', question: 'Did the client respect the agreed scope?' },
-  { key: 'payment', label: 'Payment speed', question: 'Was payment made on time?' },
+  { key: 'assets', labelKey: 'misc.rateClient.rows.assets.label', questionKey: 'misc.rateClient.rows.assets.question' },
+  { key: 'communication', labelKey: 'misc.rateClient.rows.communication.label', questionKey: 'misc.rateClient.rows.communication.question' },
+  { key: 'scope', labelKey: 'misc.rateClient.rows.scope.label', questionKey: 'misc.rateClient.rows.scope.question' },
+  { key: 'payment', labelKey: 'misc.rateClient.rows.payment.label', questionKey: 'misc.rateClient.rows.payment.question' },
 ];
 
 function StarRow({
@@ -44,6 +45,7 @@ function StarRow({
 }
 
 export default function RateClientScreen() {
+  const { t } = useTranslation();
   const navigation = useNavigation<any>();
   const [ratings, setRatings] = useState<Record<string, number>>({
     assets: 0,
@@ -65,7 +67,7 @@ export default function RateClientScreen() {
   }, [ratings]);
 
   const handleSubmit = () => {
-    Alert.alert('Rating submitted', `Overall score: ${overall}/5`);
+    Alert.alert(t('misc.rateClient.submittedTitle'), t('misc.rateClient.submittedBody', { score: overall }));
     if (navigation.canGoBack()) navigation.goBack();
   };
 
@@ -75,8 +77,8 @@ export default function RateClientScreen() {
 
   return (
     <ScrollView style={s.container} contentContainerStyle={s.content}>
-      <Text style={s.heading}>Rate Client</Text>
-      <Text style={s.subheading}>Your rating is private and helps the freelancer community</Text>
+      <Text style={s.heading}>{t('misc.rateClient.title')}</Text>
+      <Text style={s.subheading}>{t('misc.rateClient.subtitle')}</Text>
 
       <View style={s.clientCard}>
         <View style={s.avatar}>
@@ -87,22 +89,22 @@ export default function RateClientScreen() {
 
       {RATING_ROWS.map((row) => (
         <View key={row.key} style={s.ratingCard}>
-          <Text style={s.ratingLabel}>{row.label}</Text>
-          <Text style={s.ratingQuestion}>{row.question}</Text>
+          <Text style={s.ratingLabel}>{t(row.labelKey)}</Text>
+          <Text style={s.ratingQuestion}>{t(row.questionKey)}</Text>
           <StarRow value={ratings[row.key]} onChange={(v) => setRating(row.key, v)} />
         </View>
       ))}
 
       <View style={s.overallCard}>
-        <Text style={s.overallLabel}>Overall Score</Text>
+        <Text style={s.overallLabel}>{t('misc.rateClient.overallScore')}</Text>
         <Text style={s.overallValue}>{overall > 0 ? overall.toFixed(1) : '\u2014'}</Text>
-        <Text style={s.overallSub}>{overall > 0 ? 'out of 5' : 'Rate all categories'}</Text>
+        <Text style={s.overallSub}>{overall > 0 ? t('misc.rateClient.outOf5') : t('misc.rateClient.rateAll')}</Text>
       </View>
 
-      <Text style={s.feedbackLabel}>Additional feedback (optional)</Text>
+      <Text style={s.feedbackLabel}>{t('misc.rateClient.additionalFeedback')}</Text>
       <TextInput
         style={s.feedbackInput}
-        placeholder="Share any additional thoughts about working with this client..."
+        placeholder={t('misc.rateClient.feedbackPlaceholder')}
         value={feedback}
         onChangeText={setFeedback}
         multiline
@@ -111,10 +113,10 @@ export default function RateClientScreen() {
       />
 
       <TouchableOpacity style={s.primaryBtn} onPress={handleSubmit}>
-        <Text style={s.primaryBtnText}>Submit Rating</Text>
+        <Text style={s.primaryBtnText}>{t('misc.rateClient.submitRating')}</Text>
       </TouchableOpacity>
       <TouchableOpacity style={s.ghostBtn} onPress={handleSkip}>
-        <Text style={s.ghostBtnText}>Skip for now</Text>
+        <Text style={s.ghostBtnText}>{t('misc.rateClient.skipForNow')}</Text>
       </TouchableOpacity>
     </ScrollView>
   );

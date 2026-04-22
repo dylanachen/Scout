@@ -11,12 +11,12 @@ import {
   ScrollView,
   Pressable,
   Animated,
-  Alert,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useTranslation } from 'react-i18next';
 import { authApi } from '../api/client';
 import { isDemoMode } from '../api/demoAdapter';
 
@@ -24,6 +24,7 @@ type AuthStackParamList = {
   Login: undefined;
   SignUp: undefined;
   ForgotPassword: undefined;
+  SocialLogin: undefined;
 };
 
 type Props = { onAuthed: () => void };
@@ -55,6 +56,7 @@ function getPasswordStrength(pw: string) {
 }
 
 export default function SignUpScreen({ onAuthed }: Props) {
+  const { t } = useTranslation();
   const demo = isDemoMode();
   const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
   const [fullName, setFullName] = useState('');
@@ -64,7 +66,6 @@ export default function SignUpScreen({ onAuthed }: Props) {
   const [showPw, setShowPw] = useState(false);
   const [showPw2, setShowPw2] = useState(false);
   const [role, setRole] = useState<'freelancer' | 'client' | ''>('');
-  const [termsAccepted, setTermsAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState('');
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -86,10 +87,10 @@ export default function SignUpScreen({ onAuthed }: Props) {
   const validate = (field?: string) => {
     const next = { ...errors };
     if (!field || field === 'fullName') {
-      next.fullName = !fullName.trim() ? 'Enter your full name.' : '';
+      next.fullName = !fullName.trim() ? t('auth.fullName') + '.' : '';
     }
     if (!field || field === 'email') {
-      next.email = !email.trim() ? 'Enter your email.' : !validEmail(email) ? 'Enter a valid email.' : '';
+      next.email = !email.trim() ? t('auth.email') + '.' : !validEmail(email) ? 'Enter a valid email.' : '';
     }
     if (!field || field === 'password') {
       next.password = password.length < 8 ? 'Use at least 8 characters.' : '';
@@ -111,8 +112,7 @@ export default function SignUpScreen({ onAuthed }: Props) {
     email.trim() &&
     password.length >= 8 &&
     confirm === password &&
-    role &&
-    termsAccepted;
+    role;
 
   const explore = async () => {
     setFormError('');
@@ -126,7 +126,7 @@ export default function SignUpScreen({ onAuthed }: Props) {
       await AsyncStorage.setItem('scout_user_id', String(me.data.id));
       onAuthed();
     } catch (err) {
-      setFormError(formatAuthError(err) ?? 'Could not continue.');
+      setFormError(formatAuthError(err) ?? t('auth.continueText'));
     } finally {
       setLoading(false);
     }
@@ -136,7 +136,7 @@ export default function SignUpScreen({ onAuthed }: Props) {
     setFormError('');
     setTouched({ fullName: true, email: true, password: true, confirm: true });
     const v = validate();
-    if (v.fullName || v.email || v.password || v.confirm || !role || !termsAccepted) {
+    if (v.fullName || v.email || v.password || v.confirm || !role) {
       triggerShake();
       return;
     }
@@ -157,16 +157,11 @@ export default function SignUpScreen({ onAuthed }: Props) {
       await AsyncStorage.setItem('scout_user_id', String(me.data.id));
       onAuthed();
     } catch (err) {
-      setFormError(formatAuthError(err) ?? 'Could not create account.');
+      setFormError(formatAuthError(err) ?? t('auth.createFailed'));
     } finally {
       setLoading(false);
     }
   };
-
-  const openTerms = () =>
-    Alert.alert('Terms of Service', 'View the Scout Terms of Service at scout.com/terms');
-  const openPrivacy = () =>
-    Alert.alert('Privacy Policy', 'View the Scout Privacy Policy at scout.com/privacy');
 
   const strength = getPasswordStrength(password);
 
@@ -183,7 +178,7 @@ export default function SignUpScreen({ onAuthed }: Props) {
           {demo ? (
             <View style={styles.demoBox}>
               <Text style={styles.demoText}>
-                <Text style={styles.demoBold}>Demo mode</Text> — no backend. Use any email/password, or:
+                <Text style={styles.demoBold}>{t('auth.demoMode')}</Text> — {t('auth.noBackend')}. Use any email/password, or:
               </Text>
               <TouchableOpacity style={styles.demoBtn} onPress={explore} disabled={loading}>
                 <Text style={styles.demoBtnText}>Explore signed-in UI</Text>
@@ -191,22 +186,22 @@ export default function SignUpScreen({ onAuthed }: Props) {
             </View>
           ) : null}
 
-          <Text style={styles.title}>Create your account</Text>
-          <Text style={styles.sub}>Join 30 million+ freelancers building smarter client relationships</Text>
+          <Text style={styles.title}>{t('auth.createAccountTitle')}</Text>
+          <Text style={styles.sub}>{t('auth.createAccountSubtitle')}</Text>
           {formError ? <Text style={styles.err}>{formError}</Text> : null}
 
-          <Text style={styles.label}>Full name</Text>
+          <Text style={styles.label}>{t('auth.fullName')}</Text>
           <TextInput
             style={[styles.input, touched.fullName && errors.fullName ? styles.inputErr : null]}
             value={fullName}
             onChangeText={setFullName}
             onBlur={() => blur('fullName')}
-            placeholder="Your full name"
+            placeholder={t('auth.fullName')}
             placeholderTextColor="#9aa0ae"
           />
           {touched.fullName && errors.fullName ? <Text style={styles.fieldErr}>{errors.fullName}</Text> : null}
 
-          <Text style={styles.label}>Email</Text>
+          <Text style={styles.label}>{t('auth.email')}</Text>
           <TextInput
             style={[styles.input, touched.email && errors.email ? styles.inputErr : null]}
             autoCapitalize="none"
@@ -219,7 +214,7 @@ export default function SignUpScreen({ onAuthed }: Props) {
           />
           {touched.email && errors.email ? <Text style={styles.fieldErr}>{errors.email}</Text> : null}
 
-          <Text style={styles.label}>Password</Text>
+          <Text style={styles.label}>{t('auth.password')}</Text>
           <View style={styles.pwRow}>
             <TextInput
               style={[styles.input, { flex: 1, marginBottom: 0 }, touched.password && errors.password ? styles.inputErr : null]}
@@ -230,11 +225,11 @@ export default function SignUpScreen({ onAuthed }: Props) {
                 if (touched.confirm) setErrors((e) => ({ ...e, confirm: t !== confirm ? 'Passwords do not match.' : '' }));
               }}
               onBlur={() => blur('password')}
-              placeholder="Create a password"
+              placeholder={t('auth.password')}
               placeholderTextColor="#9aa0ae"
             />
             <Pressable onPress={() => setShowPw((s) => !s)} style={styles.showBtn}>
-              <Text style={styles.showBtnText}>{showPw ? 'Hide' : 'Show'}</Text>
+              <Text style={styles.showBtnText}>{showPw ? t('auth.hide') : t('auth.show')}</Text>
             </Pressable>
           </View>
           {touched.password && errors.password ? <Text style={styles.fieldErr}>{errors.password}</Text> : null}
@@ -248,7 +243,7 @@ export default function SignUpScreen({ onAuthed }: Props) {
             </View>
           )}
 
-          <Text style={styles.label}>Confirm password</Text>
+          <Text style={styles.label}>{t('auth.confirmPassword')}</Text>
           <View style={styles.pwRow}>
             <TextInput
               style={[styles.input, { flex: 1, marginBottom: 0 }, touched.confirm && errors.confirm ? styles.inputErr : null]}
@@ -259,16 +254,16 @@ export default function SignUpScreen({ onAuthed }: Props) {
                 if (touched.confirm) setErrors((e) => ({ ...e, confirm: t !== password ? 'Passwords do not match.' : '' }));
               }}
               onBlur={() => blur('confirm')}
-              placeholder="Confirm your password"
+              placeholder={t('auth.confirmPassword')}
               placeholderTextColor="#9aa0ae"
             />
             <Pressable onPress={() => setShowPw2((s) => !s)} style={styles.showBtn}>
-              <Text style={styles.showBtnText}>{showPw2 ? 'Hide' : 'Show'}</Text>
+              <Text style={styles.showBtnText}>{showPw2 ? t('auth.hide') : t('auth.show')}</Text>
             </Pressable>
           </View>
           {touched.confirm && errors.confirm ? <Text style={styles.fieldErr}>{errors.confirm}</Text> : null}
 
-          <Text style={[styles.label, { marginTop: 6 }]}>Choose your role</Text>
+          <Text style={[styles.label, { marginTop: 6 }]}>{t('auth.chooseRole')}</Text>
           <View style={styles.roleRow}>
             <TouchableOpacity
               style={[styles.roleCard, role === 'freelancer' && styles.roleCardOn]}
@@ -281,8 +276,8 @@ export default function SignUpScreen({ onAuthed }: Props) {
                 </View>
               )}
               <Text style={styles.roleEmoji}>{'\u{1F4BC}'}</Text>
-              <Text style={styles.roleTitle}>I'm a Freelancer</Text>
-              <Text style={styles.roleDesc}>I find and work with clients</Text>
+              <Text style={styles.roleTitle}>{t('auth.roleFreelancer')}</Text>
+              <Text style={styles.roleDesc}>{t('auth.roleFreelancerDesc')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.roleCard, role === 'client' && styles.roleCardOn]}
@@ -295,32 +290,9 @@ export default function SignUpScreen({ onAuthed }: Props) {
                 </View>
               )}
               <Text style={styles.roleEmoji}>{'\u{1F3E2}'}</Text>
-              <Text style={styles.roleTitle}>I'm a Client</Text>
-              <Text style={styles.roleDesc}>I hire freelancers for projects</Text>
+              <Text style={styles.roleTitle}>{t('auth.roleClient')}</Text>
+              <Text style={styles.roleDesc}>{t('auth.roleClientDesc')}</Text>
             </TouchableOpacity>
-          </View>
-
-          {/* Terms — checkbox + separately tappable links */}
-          <View style={styles.termsRow}>
-            <TouchableOpacity
-              onPress={() => setTermsAccepted((v) => !v)}
-              activeOpacity={0.7}
-              hitSlop={8}
-            >
-              <View style={[styles.checkbox, termsAccepted && styles.checkboxOn]}>
-                {termsAccepted && <Text style={styles.checkboxMark}>{'\u2713'}</Text>}
-              </View>
-            </TouchableOpacity>
-            <Text style={styles.termsText}>
-              I agree to the{' '}
-              <Text style={styles.termsLink} onPress={openTerms}>
-                Terms of Service
-              </Text>
-              {' '}and{' '}
-              <Text style={styles.termsLink} onPress={openPrivacy}>
-                Privacy Policy
-              </Text>
-            </Text>
           </View>
 
           <TouchableOpacity
@@ -331,17 +303,23 @@ export default function SignUpScreen({ onAuthed }: Props) {
             {loading ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <ActivityIndicator color="#fff" size="small" />
-                <Text style={styles.btnText}>Creating your account…</Text>
+                <Text style={styles.btnText}>{t('auth.creatingAccount')}</Text>
               </View>
             ) : (
-              <Text style={styles.btnText}>Create Account</Text>
+              <Text style={styles.btnText}>{t('auth.createAccount')}</Text>
             )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.btn, { marginTop: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e6ed' }]}
+            onPress={() => navigation.navigate('SocialLogin')}
+          >
+            <Text style={[styles.btnText, { color: '#0f1623' }]}>{t('auth.continueGoogle')}</Text>
           </TouchableOpacity>
 
           <View style={styles.switchRow}>
-            <Text style={styles.switchText}>Already have an account? </Text>
+            <Text style={styles.switchText}>{t('auth.haveAccount')} </Text>
             <TouchableOpacity onPress={() => navigation.navigate('Login')} hitSlop={8}>
-              <Text style={styles.switchLink}>Log in</Text>
+              <Text style={styles.switchLink}>{t('auth.logInLink')}</Text>
             </TouchableOpacity>
           </View>
         </Animated.View>

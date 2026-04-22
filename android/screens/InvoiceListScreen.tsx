@@ -1,14 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
+  RefreshControl,
 } from 'react-native';
 import { api } from '../api/client';
 import useDemoActive from '../hooks/useDemoActive';
 import FilterPillTabs from '../components/FilterPillTabs';
+import EmptyState from '../components/states/EmptyState';
+import Skeleton from '../components/states/Skeleton';
+import ErrorState from '../components/states/ErrorState';
+import { useTranslation } from 'react-i18next';
 
 type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue';
 
@@ -128,29 +133,47 @@ const FILTER_TABS: { label: string; value: InvoiceStatus | 'all' }[] = [
 ];
 
 export default function InvoiceListScreen() {
+  const { t } = useTranslation();
   const demoActive = useDemoActive();
   const [activeFilter, setActiveFilter] = useState<InvoiceStatus | 'all'>('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(8);
 
-  useEffect(() => {
+  const fetchInvoices = useCallback(async () => {
+    setError('');
     if (demoActive) {
       setInvoices(DEMO_INVOICES);
+      setLoading(false);
       return;
     }
-    let cancelled = false;
-    (async () => {
-      try {
-        const { data } = await api.get('/invoices');
-        if (!cancelled && Array.isArray(data)) setInvoices(data);
-      } catch { /* backend unavailable */ }
-    })();
-    return () => { cancelled = true; };
+    try {
+      const { data } = await api.get('/invoices');
+      if (Array.isArray(data)) setInvoices(data);
+    } catch {
+      setError('Failed to load invoices');
+    } finally {
+      setLoading(false);
+    }
   }, [demoActive]);
+
+  useEffect(() => {
+    fetchInvoices();
+  }, [fetchInvoices]);
 
   const filtered = activeFilter === 'all'
     ? invoices
     : invoices.filter((inv) => inv.status === activeFilter);
+  const visible = filtered.slice(0, visibleCount);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchInvoices();
+    setRefreshing(false);
+  };
 
   const toggleExpand = (id: string) => {
     setExpandedId((prev) => (prev === id ? null : id));
@@ -158,23 +181,26 @@ export default function InvoiceListScreen() {
 
   return (
     <View style={s.container}>
-      <Text style={s.heading}>Invoices</Text>
+      <Text style={s.heading}>{t('invoices.title')}</Text>
 
       <FilterPillTabs tabs={FILTER_TABS} active={activeFilter} onChange={setActiveFilter} />
 
-      <ScrollView contentContainerStyle={s.list}>
-        {filtered.length === 0 ? (
-          <View style={s.emptyState}>
-            <View style={s.emptyIcon}>
-              <Text style={{ fontSize: 22, color: '#9aa0ae' }}>$</Text>
-            </View>
-            <Text style={s.emptyTitle}>No invoices</Text>
-            <Text style={s.emptyDesc}>
-              No {activeFilter !== 'all' ? activeFilter : ''} invoices to display.
-            </Text>
+      <ScrollView contentContainerStyle={s.list} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+        {loading ? (
+          <View style={{ gap: 8, marginBottom: 8 }}>
+            <Skeleton height={60} />
+            <Skeleton height={60} />
+            <Skeleton height={60} />
           </View>
+        ) : null}
+        {error ? <ErrorState message={error} onRetry={() => void fetchInvoices()} /> : null}
+        {filtered.length === 0 && !loading ? (
+          <EmptyState
+            title={t('invoices.empty')}
+            subtitle={t('invoices.noInvoicesForFilter', { filter: activeFilter !== 'all' ? activeFilter : '' })}
+          />
         ) : (
-          filtered.map((inv) => {
+          visible.map((inv) => {
             const expanded = expandedId === inv.id;
             const sty = STATUS_STYLE[inv.status];
             return (
@@ -183,6 +209,9 @@ export default function InvoiceListScreen() {
                 style={[s.invoiceRow, inv.status === 'overdue' && s.overdueBorder]}
                 onPress={() => toggleExpand(inv.id)}
                 activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={`${inv.number} ${inv.client}`}
+                accessibilityHint="Expand invoice details"
               >
                 <View style={s.invoiceHeader}>
                   <View style={{ flex: 1, gap: 2 }}>
@@ -203,7 +232,7 @@ export default function InvoiceListScreen() {
 
                 {expanded && (
                   <View style={s.expandedSection}>
-                    <Text style={s.sectionLabel}>Line Items</Text>
+                    <Text style={s.sectionLabel}>{t('invoices.lineItems')}</Text>
                     {inv.lineItems.map((item, i) => (
                       <View key={i} style={s.lineItemRow}>
                         <Text style={s.lineItemDesc}>{item.description}</Text>
@@ -211,11 +240,11 @@ export default function InvoiceListScreen() {
                       </View>
                     ))}
                     <View style={[s.lineItemRow, { borderTopWidth: 1, borderTopColor: '#e2e6ed', paddingTop: 8, marginTop: 4 }]}>
-                      <Text style={[s.lineItemDesc, { fontWeight: '700' }]}>Total</Text>
+                      <Text style={[s.lineItemDesc, { fontWeight: '700' }]}>{t('invoices.total')}</Text>
                       <Text style={[s.lineItemAmt, { fontWeight: '700' }]}>${inv.amount.toLocaleString()}</Text>
                     </View>
 
-                    <Text style={[s.sectionLabel, { marginTop: 14 }]}>Timeline</Text>
+                    <Text style={[s.sectionLabel, { marginTop: 14 }]}>{t('invoices.timeline')}</Text>
                     {inv.timeline.map((evt, i) => (
                       <View key={i} style={s.timelineRow}>
                         <View style={[s.timelineDot, evt.date ? s.timelineDotFilled : s.timelineDotEmpty]} />
@@ -227,12 +256,12 @@ export default function InvoiceListScreen() {
                     <View style={s.actionRow}>
                       {inv.status !== 'paid' && (
                         <TouchableOpacity style={s.actionBtn}>
-                          <Text style={s.actionBtnText}>Send Reminder</Text>
+                          <Text style={s.actionBtnText}>{t('invoices.sendReminder')}</Text>
                         </TouchableOpacity>
                       )}
                       {inv.status !== 'paid' && (
                         <TouchableOpacity style={[s.actionBtn, s.actionBtnPrimary]}>
-                          <Text style={s.actionBtnPrimaryText}>Mark as Paid</Text>
+                          <Text style={s.actionBtnPrimaryText}>{t('invoices.markPaid')}</Text>
                         </TouchableOpacity>
                       )}
                     </View>
@@ -242,6 +271,11 @@ export default function InvoiceListScreen() {
             );
           })
         )}
+        {filtered.length > visible.length ? (
+          <TouchableOpacity style={[s.actionBtn, { marginTop: 8 }]} onPress={() => setVisibleCount((prev) => prev + 8)}>
+            <Text style={s.actionBtnText}>Load more</Text>
+          </TouchableOpacity>
+        ) : null}
       </ScrollView>
     </View>
   );
@@ -277,8 +311,4 @@ const s = StyleSheet.create({
   actionBtnText: { fontSize: 13, fontWeight: '600', color: '#4a5568' },
   actionBtnPrimary: { backgroundColor: '#1d6ecd', borderColor: '#1d6ecd' },
   actionBtnPrimaryText: { fontSize: 13, fontWeight: '600', color: '#fff' },
-  emptyState: { alignItems: 'center', paddingTop: 60 },
-  emptyIcon: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-  emptyTitle: { fontSize: 16, fontWeight: '600', color: '#0f1623', marginBottom: 4 },
-  emptyDesc: { fontSize: 13, color: '#9aa0ae' },
 });

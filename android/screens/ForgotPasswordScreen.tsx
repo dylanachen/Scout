@@ -13,6 +13,7 @@ import {
 import axios from 'axios';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useTranslation } from 'react-i18next';
 import { authApi } from '../api/client';
 
 type AuthStackParamList = {
@@ -35,6 +36,7 @@ function validEmail(s: string) {
 }
 
 export default function ForgotPasswordScreen() {
+  const { t } = useTranslation();
   const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
   const [email, setEmail] = useState('');
   const [touched, setTouched] = useState(false);
@@ -45,24 +47,34 @@ export default function ForgotPasswordScreen() {
 
   const blur = () => {
     setTouched(true);
-    const t = email.trim();
-    setEmailError(!t ? 'Enter your email.' : !validEmail(t) ? 'Enter a valid email.' : '');
+    const emailValue = email.trim();
+    setEmailError(
+      !emailValue
+        ? t('misc.forgotPassword.errors.enterEmail')
+        : !validEmail(emailValue)
+          ? t('misc.forgotPassword.errors.validEmail')
+          : '',
+    );
   };
 
   const submit = async () => {
     setSubmitError('');
     blur();
-    const t = email.trim();
-    const err = !t ? 'Enter your email.' : !validEmail(t) ? 'Enter a valid email.' : '';
+    const emailValue = email.trim();
+    const err = !emailValue
+      ? t('misc.forgotPassword.errors.enterEmail')
+      : !validEmail(emailValue)
+        ? t('misc.forgotPassword.errors.validEmail')
+        : '';
     setEmailError(err);
     if (err) return;
 
     setLoading(true);
     try {
-      await authApi.forgotPassword(t);
+      await authApi.forgotPassword(emailValue);
       setSuccess(true);
     } catch (e) {
-      setSubmitError(formatAuthError(e) ?? 'Something went wrong.');
+      setSubmitError(formatAuthError(e) ?? t('misc.forgotPassword.errors.generic'));
     } finally {
       setLoading(false);
     }
@@ -73,7 +85,7 @@ export default function ForgotPasswordScreen() {
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <View style={styles.card}>
           <TouchableOpacity onPress={() => navigation.navigate('Login')} style={styles.backRow} hitSlop={12}>
-            <Text style={styles.backText}>← Back to log in</Text>
+            <Text style={styles.backText}>{t('misc.forgotPassword.backToLogin')}</Text>
           </TouchableOpacity>
 
           <View style={{ alignItems: 'center', marginBottom: 16 }}>
@@ -88,20 +100,20 @@ export default function ForgotPasswordScreen() {
               <View style={styles.check}>
                 <Text style={styles.checkMark}>✓</Text>
               </View>
-              <Text style={styles.title}>Check your inbox</Text>
+              <Text style={styles.title}>{t('misc.forgotPassword.checkInboxTitle')}</Text>
               <Text style={styles.subCenter}>
-                If an account exists for that email, we&apos;ve sent reset instructions.
+                {t('misc.forgotPassword.checkInboxBody')}
               </Text>
               <TouchableOpacity onPress={() => navigation.navigate('Login')} style={styles.linkBtn}>
-                <Text style={styles.linkBtnText}>Return to log in</Text>
+                <Text style={styles.linkBtnText}>{t('misc.forgotPassword.returnToLogin')}</Text>
               </TouchableOpacity>
             </View>
           ) : (
             <>
-              <Text style={styles.titleForm}>Reset your password</Text>
-              <Text style={styles.sub}>We&apos;ll send a reset link to your email.</Text>
+              <Text style={styles.titleForm}>{t('misc.forgotPassword.title')}</Text>
+              <Text style={styles.sub}>{t('misc.forgotPassword.subtitle')}</Text>
 
-              <Text style={styles.label}>Email</Text>
+              <Text style={styles.label}>{t('auth.email')}</Text>
               <TextInput
                 style={[styles.input, touched && emailError ? styles.inputErr : null]}
                 autoCapitalize="none"
@@ -109,14 +121,14 @@ export default function ForgotPasswordScreen() {
                 value={email}
                 onChangeText={setEmail}
                 onBlur={blur}
-                placeholder="you@example.com"
+                placeholder={t('misc.forgotPassword.emailPlaceholder')}
                 placeholderTextColor="#9aa0ae"
               />
               {touched && emailError ? <Text style={styles.fieldErr}>{emailError}</Text> : null}
               {submitError ? <Text style={styles.fieldErr}>{submitError}</Text> : null}
 
               <TouchableOpacity style={[styles.btn, loading && styles.btnDisabled]} onPress={submit} disabled={loading}>
-                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Send Reset Link</Text>}
+                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>{t('misc.forgotPassword.sendReset')}</Text>}
               </TouchableOpacity>
             </>
           )}

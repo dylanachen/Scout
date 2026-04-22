@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,86 +8,92 @@ import {
   Switch,
   TextInput,
   Alert,
+  PermissionsAndroid,
+  Platform,
+  Image,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 
 const SECTIONS = [
-  { id: 'notifications', label: 'Notifications', icon: 'N', iconBg: '#dbeafe', iconColor: '#1d6ecd', description: 'Push and email notification preferences' },
-  { id: 'scope-guardian', label: 'Scope Guardian', icon: '!', iconBg: '#fef3c7', iconColor: '#d97706', description: 'Set how aggressively we flag scope changes' },
-  { id: 'rates-pricing', label: 'Rates & Pricing', icon: '$', iconBg: '#dcfce7', iconColor: '#16a34a', description: 'Default hourly rate, tax, payment terms' },
-  { id: 'communication', label: 'Communication Preferences', icon: 'C', iconBg: '#f3e8ff', iconColor: '#7c3aed', description: 'Response time, meeting style, feedback' },
-  { id: 'account', label: 'Account', icon: 'A', iconBg: '#fce7f3', iconColor: '#db2777', description: 'Profile, password, log out, delete account' },
+  { id: 'notifications', labelKey: 'settingsPage.sections.notifications.label', icon: 'N', iconBg: '#dbeafe', iconColor: '#1d6ecd', descriptionKey: 'settingsPage.sections.notifications.description' },
+  { id: 'scope-guardian', labelKey: 'settingsPage.sections.scopeGuardian.label', icon: '!', iconBg: '#fef3c7', iconColor: '#d97706', descriptionKey: 'settingsPage.sections.scopeGuardian.description' },
+  { id: 'rates-pricing', labelKey: 'settingsPage.sections.ratesPricing.label', icon: '$', iconBg: '#dcfce7', iconColor: '#16a34a', descriptionKey: 'settingsPage.sections.ratesPricing.description' },
+  { id: 'communication', labelKey: 'settingsPage.sections.communication.label', icon: 'C', iconBg: '#f3e8ff', iconColor: '#7c3aed', descriptionKey: 'settingsPage.sections.communication.description' },
+  { id: 'account', labelKey: 'settingsPage.sections.account.label', icon: 'A', iconBg: '#fce7f3', iconColor: '#db2777', descriptionKey: 'settingsPage.sections.account.description' },
 ];
 
 const NOTIFICATION_TYPES = [
-  { key: 'messages', label: 'Messages' },
-  { key: 'scopeFlags', label: 'Scope flags' },
-  { key: 'invoices', label: 'Invoices' },
-  { key: 'meetings', label: 'Meetings' },
-  { key: 'milestones', label: 'Milestones' },
-  { key: 'timeAlerts', label: 'Time alerts' },
+  { key: 'messages', labelKey: 'settingsPage.notificationTypes.messages' },
+  { key: 'scopeFlags', labelKey: 'settingsPage.notificationTypes.scopeFlags' },
+  { key: 'invoices', labelKey: 'settingsPage.notificationTypes.invoices' },
+  { key: 'meetings', labelKey: 'settingsPage.notificationTypes.meetings' },
+  { key: 'milestones', labelKey: 'settingsPage.notificationTypes.milestones' },
+  { key: 'timeAlerts', labelKey: 'settingsPage.notificationTypes.timeAlerts' },
 ];
 
 const SCOPE_LEVELS = [
   {
     key: 'relaxed',
-    label: 'Relaxed',
+    labelKey: 'settingsPage.scopeLevels.relaxed.label',
     icon: '\uD83D\uDEE1\uFE0F',
-    desc: 'Only flag major scope changes. Best for flexible projects with evolving requirements.',
+    descKey: 'settingsPage.scopeLevels.relaxed.description',
     color: '#16a34a',
     bg: '#f0fdf4',
   },
   {
     key: 'balanced',
-    label: 'Balanced',
+    labelKey: 'settingsPage.scopeLevels.balanced.label',
     icon: '\uD83D\uDEE1\uFE0F',
-    desc: 'Flag moderate and major changes. Recommended for most projects.',
+    descKey: 'settingsPage.scopeLevels.balanced.description',
     color: '#ca8a04',
     bg: '#fefce8',
   },
   {
     key: 'strict',
-    label: 'Strict',
+    labelKey: 'settingsPage.scopeLevels.strict.label',
     icon: '\uD83D\uDEE1\uFE0F',
-    desc: 'Flag all scope changes, however small. Best for fixed-bid work.',
+    descKey: 'settingsPage.scopeLevels.strict.description',
     color: '#dc2626',
     bg: '#fef2f2',
   },
 ];
 
 const RATE_TYPES = [
-  { key: 'hourly', label: 'Hourly' },
-  { key: 'perProject', label: 'Per Project' },
-  { key: 'retainer', label: 'Retainer' },
+  { key: 'hourly', labelKey: 'settingsPage.rateTypes.hourly' },
+  { key: 'perProject', labelKey: 'settingsPage.rateTypes.perProject' },
+  { key: 'retainer', labelKey: 'settingsPage.rateTypes.retainer' },
 ];
 
 const PAYMENT_TERMS = [
-  { key: 'net15', label: 'Net 15' },
-  { key: 'net30', label: 'Net 30' },
-  { key: 'net45', label: 'Net 45' },
-  { key: 'upon', label: 'Upon completion' },
+  { key: 'net15', labelKey: 'settingsPage.paymentTerms.net15' },
+  { key: 'net30', labelKey: 'settingsPage.paymentTerms.net30' },
+  { key: 'net45', labelKey: 'settingsPage.paymentTerms.net45' },
+  { key: 'upon', labelKey: 'settingsPage.paymentTerms.uponCompletion' },
 ];
 
 const RESPONSE_TIMES = [
-  { key: 'withinHours', label: 'Within hours', color: '#16a34a' },
-  { key: 'sameDay', label: 'Same day', color: '#ca8a04' },
-  { key: 'within48h', label: 'Within 48h', color: '#6366f1' },
+  { key: 'withinHours', labelKey: 'settingsPage.responseTimes.withinHours', color: '#16a34a' },
+  { key: 'sameDay', labelKey: 'settingsPage.responseTimes.sameDay', color: '#ca8a04' },
+  { key: 'within48h', labelKey: 'settingsPage.responseTimes.within48h', color: '#6366f1' },
 ];
 
 const MEETING_STYLES = [
-  { key: 'video', label: 'Video calls', color: '#1d6ecd' },
-  { key: 'audio', label: 'Audio only', color: '#16a34a' },
-  { key: 'written', label: 'Written only', color: '#7c3aed' },
+  { key: 'video', labelKey: 'settingsPage.meetingStyles.videoCalls', color: '#1d6ecd' },
+  { key: 'audio', labelKey: 'settingsPage.meetingStyles.audioOnly', color: '#16a34a' },
+  { key: 'written', labelKey: 'settingsPage.meetingStyles.writtenOnly', color: '#7c3aed' },
 ];
 
 const FEEDBACK_STYLES = [
-  { key: 'direct', label: 'Direct and honest', color: '#dc2626' },
-  { key: 'diplomatic', label: 'Diplomatic', color: '#1d6ecd' },
+  { key: 'direct', labelKey: 'settingsPage.feedbackStyles.direct', color: '#dc2626' },
+  { key: 'diplomatic', labelKey: 'settingsPage.feedbackStyles.diplomatic', color: '#1d6ecd' },
 ];
 
 export default function SettingsScreen() {
+  const { t } = useTranslation();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { user } = useAuth();
 
@@ -125,6 +131,24 @@ export default function SettingsScreen() {
   const [responseTime, setResponseTime] = useState('sameDay');
   const [meetingStyle, setMeetingStyle] = useState('video');
   const [feedbackStyle, setFeedbackStyle] = useState('direct');
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const raw = await AsyncStorage.getItem('scout_notification_preferences');
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed?.notifToggles) setNotifToggles(parsed.notifToggles);
+          if (parsed?.emailToggles) setEmailToggles(parsed.emailToggles);
+        } catch {
+          /* ignore bad data */
+        }
+      }
+      const bio = await AsyncStorage.getItem('scout_biometric_enabled');
+      setBiometricEnabled(bio === '1');
+    })();
+  }, []);
 
   const handleRowPress = (id: string) => {
     if (id === 'account') {
@@ -135,10 +159,28 @@ export default function SettingsScreen() {
   };
 
   const toggleNotif = (key: string) =>
-    setNotifToggles((prev) => ({ ...prev, [key]: !prev[key] }));
+    setNotifToggles((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      AsyncStorage.setItem('scout_notification_preferences', JSON.stringify({ notifToggles: next, emailToggles }));
+      return next;
+    });
 
   const toggleEmail = (key: string) =>
-    setEmailToggles((prev) => ({ ...prev, [key]: !prev[key] }));
+    setEmailToggles((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      AsyncStorage.setItem('scout_notification_preferences', JSON.stringify({ notifToggles, emailToggles: next }));
+      return next;
+    });
+
+  const requestRuntimePermissions = async () => {
+    if (Platform.OS !== 'android') return;
+    const permissions = [PermissionsAndroid.PERMISSIONS.CAMERA];
+    if (Platform.Version >= 33) {
+      permissions.push(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
+    }
+    await PermissionsAndroid.requestMultiple(permissions);
+    Alert.alert(t('settingsPage.permissionsUpdated'), t('settingsPage.permissionsRequested'));
+  };
 
   const setRateField = (field: string, value: string) => {
     setRatesDirty(true);
@@ -150,7 +192,7 @@ export default function SettingsScreen() {
 
   const handleSaveRates = () => {
     setRatesDirty(false);
-    Alert.alert('Saved', 'Your rates & pricing preferences have been saved.');
+    Alert.alert(t('settingsPage.saved'), t('settingsPage.ratesSaved'));
   };
 
   /* ── Section renderers ── */
@@ -160,7 +202,7 @@ export default function SettingsScreen() {
       {NOTIFICATION_TYPES.map((nt) => (
         <View key={nt.key} style={styles.notifItem}>
           <View style={styles.notifRow}>
-            <Text style={styles.notifLabel}>{nt.label}</Text>
+            <Text style={styles.notifLabel}>{t(nt.labelKey)}</Text>
             <Switch
               value={notifToggles[nt.key]}
               onValueChange={() => toggleNotif(nt.key)}
@@ -170,7 +212,7 @@ export default function SettingsScreen() {
           </View>
           {notifToggles[nt.key] && (
             <View style={styles.emailRow}>
-              <Text style={styles.emailLabel}>Also notify by email</Text>
+              <Text style={styles.emailLabel}>{t('settingsPage.alsoNotifyEmail')}</Text>
               <Switch
                 value={emailToggles[nt.key]}
                 onValueChange={() => toggleEmail(nt.key)}
@@ -205,7 +247,7 @@ export default function SettingsScreen() {
             <View style={styles.scopeHeader}>
               <Text style={styles.scopeIcon}>{level.icon}</Text>
               <Text style={[styles.scopeLabel, { color: level.color }]}>
-                {level.label}
+                {t(level.labelKey)}
               </Text>
               {active && (
                 <Text style={[styles.scopeCheck, { color: level.color }]}>
@@ -213,7 +255,7 @@ export default function SettingsScreen() {
                 </Text>
               )}
             </View>
-            <Text style={styles.scopeDesc}>{level.desc}</Text>
+            <Text style={styles.scopeDesc}>{t(level.descKey)}</Text>
           </TouchableOpacity>
         );
       })}
@@ -222,7 +264,7 @@ export default function SettingsScreen() {
 
   const renderRatesPricing = () => (
     <View style={styles.panel}>
-      <Text style={styles.fieldLabel}>Hourly Rate</Text>
+      <Text style={styles.fieldLabel}>{t('settingsPage.hourlyRate')}</Text>
       <View style={styles.inputRow}>
         <TextInput
           style={styles.textInput}
@@ -235,7 +277,7 @@ export default function SettingsScreen() {
         <Text style={styles.inputSuffix}>$/hr</Text>
       </View>
 
-      <Text style={[styles.fieldLabel, { marginTop: 18 }]}>Rate Type</Text>
+      <Text style={[styles.fieldLabel, { marginTop: 18 }]}>{t('settingsPage.rateType')}</Text>
       <View style={styles.chipRow}>
         {RATE_TYPES.map((rt) => (
           <TouchableOpacity
@@ -249,13 +291,13 @@ export default function SettingsScreen() {
                 rateType === rt.key && styles.chipTextActive,
               ]}
             >
-              {rt.label}
+              {t(rt.labelKey)}
             </Text>
           </TouchableOpacity>
         ))}
       </View>
 
-      <Text style={[styles.fieldLabel, { marginTop: 18 }]}>Tax Percentage</Text>
+      <Text style={[styles.fieldLabel, { marginTop: 18 }]}>{t('settingsPage.taxPercentage')}</Text>
       <View style={styles.inputRow}>
         <TextInput
           style={styles.textInput}
@@ -268,7 +310,7 @@ export default function SettingsScreen() {
         <Text style={styles.inputSuffix}>%</Text>
       </View>
 
-      <Text style={[styles.fieldLabel, { marginTop: 18 }]}>Payment Terms</Text>
+      <Text style={[styles.fieldLabel, { marginTop: 18 }]}>{t('settingsPage.paymentTermsTitle')}</Text>
       <View style={styles.chipRow}>
         {PAYMENT_TERMS.map((pt) => (
           <TouchableOpacity
@@ -282,7 +324,7 @@ export default function SettingsScreen() {
                 paymentTerms === pt.key && styles.chipTextActive,
               ]}
             >
-              {pt.label}
+              {t(pt.labelKey)}
             </Text>
           </TouchableOpacity>
         ))}
@@ -296,7 +338,7 @@ export default function SettingsScreen() {
         <Text
           style={[styles.saveBtnText, !ratesDirty && styles.saveBtnTextOff]}
         >
-          Save
+          {t('common.save')}
         </Text>
       </TouchableOpacity>
     </View>
@@ -304,7 +346,7 @@ export default function SettingsScreen() {
 
   const renderCommunication = () => {
     const cardGroup = (
-      items: { key: string; label: string; color: string }[],
+      items: { key: string; labelKey: string; color: string }[],
       selected: string,
       onSelect: (k: string) => void,
     ) =>
@@ -326,7 +368,7 @@ export default function SettingsScreen() {
                 active && { color: item.color, fontWeight: '700' },
               ]}
             >
-              {item.label}
+              {t(item.labelKey)}
             </Text>
           </TouchableOpacity>
         );
@@ -334,20 +376,20 @@ export default function SettingsScreen() {
 
     return (
       <View style={styles.panel}>
-        <Text style={styles.fieldLabel}>Response Time</Text>
+        <Text style={styles.fieldLabel}>{t('settingsPage.responseTime')}</Text>
         <View style={styles.cardGroup}>
           {cardGroup(RESPONSE_TIMES, responseTime, setResponseTime)}
         </View>
 
         <Text style={[styles.fieldLabel, { marginTop: 18 }]}>
-          Meeting Style
+          {t('settingsPage.meetingStyle')}
         </Text>
         <View style={styles.cardGroup}>
           {cardGroup(MEETING_STYLES, meetingStyle, setMeetingStyle)}
         </View>
 
         <Text style={[styles.fieldLabel, { marginTop: 18 }]}>
-          Feedback Style
+          {t('settingsPage.feedbackStyle')}
         </Text>
         <View style={styles.cardGroup}>
           {cardGroup(FEEDBACK_STYLES, feedbackStyle, setFeedbackStyle)}
@@ -373,16 +415,20 @@ export default function SettingsScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.heading}>Settings</Text>
+      <Text style={styles.heading}>{t('settingsPage.title')}</Text>
 
       <TouchableOpacity
         style={styles.userCard}
         activeOpacity={0.7}
         onPress={() => navigation.navigate('AccountSettings')}
       >
-        <View style={styles.userAvatar}>
-          <Text style={styles.userInitial}>{userInitial}</Text>
-        </View>
+        {user?.avatar_url ? (
+          <Image source={{ uri: user.avatar_url }} style={styles.userAvatar} />
+        ) : (
+          <View style={styles.userAvatar}>
+            <Text style={styles.userInitial}>{userInitial}</Text>
+          </View>
+        )}
         <View style={{ flex: 1 }}>
           <Text style={styles.userName}>{userName}</Text>
           <Text style={styles.userEmail}>{userEmail}</Text>
@@ -414,8 +460,8 @@ export default function SettingsScreen() {
                 </Text>
               </View>
               <View style={styles.rowContent}>
-                <Text style={styles.rowLabel}>{section.label}</Text>
-                <Text style={styles.rowDesc}>{section.description}</Text>
+                <Text style={styles.rowLabel}>{t(section.labelKey)}</Text>
+                <Text style={styles.rowDesc}>{t(section.descriptionKey)}</Text>
               </View>
               <Text style={styles.arrow}>
                 {isExpandable
@@ -430,6 +476,76 @@ export default function SettingsScreen() {
           </React.Fragment>
         );
       })}
+
+      <View style={[styles.panel, { marginTop: 8, borderTopWidth: 1, borderTopColor: '#e2e6ed' }]}>
+        <View style={styles.notifRow}>
+          <Text style={styles.notifLabel}>{t('settingsPage.biometricUnlock')}</Text>
+          <Switch
+            value={biometricEnabled}
+            onValueChange={(value) => {
+              setBiometricEnabled(value);
+              AsyncStorage.setItem('scout_biometric_enabled', value ? '1' : '0');
+            }}
+          />
+        </View>
+        <TouchableOpacity style={[styles.saveBtn, { marginTop: 12 }]} onPress={requestRuntimePermissions}>
+          <Text style={styles.saveBtnText}>{t('settingsPage.requestPermissions')}</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.panel}>
+        <Text style={styles.fieldLabel}>Support</Text>
+        <View style={styles.cardGroup}>
+          <TouchableOpacity style={styles.optionCard} onPress={() => navigation.navigate('HelpFaq')}>
+            <Text style={styles.optionCardText}>{t('settingsPage.links.helpFaq')}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={styles.panel}>
+        <Text style={styles.fieldLabel}>{t('settingsPage.upcomingSurfaces')}</Text>
+        <View style={styles.cardGroup}>
+          <TouchableOpacity style={styles.optionCard} onPress={() => navigation.navigate('PublicProfile')}>
+            <Text style={styles.optionCardText}>{t('settingsPage.links.publicProfile')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.optionCard} onPress={() => navigation.navigate('ProposalForm')}>
+            <Text style={styles.optionCardText}>{t('settingsPage.links.proposalForm')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.optionCard} onPress={() => navigation.navigate('Milestones')}>
+            <Text style={styles.optionCardText}>{t('settingsPage.links.milestones')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.optionCard} onPress={() => navigation.navigate('GlobalSearch')}>
+            <Text style={styles.optionCardText}>{t('settingsPage.links.globalSearch')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.optionCard} onPress={() => navigation.navigate('Inbox')}>
+            <Text style={styles.optionCardText}>{t('settingsPage.links.unifiedInbox')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.optionCard} onPress={() => navigation.navigate('PaymentMethods')}>
+            <Text style={styles.optionCardText}>{t('settingsPage.links.payments')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.optionCard} onPress={() => navigation.navigate('EarningsDashboard')}>
+            <Text style={styles.optionCardText}>{t('settingsPage.links.earningsDashboard')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.optionCard} onPress={() => navigation.navigate('Referrals')}>
+            <Text style={styles.optionCardText}>{t('settingsPage.links.referrals')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.optionCard} onPress={() => navigation.navigate('CalendarScheduling')}>
+            <Text style={styles.optionCardText}>{t('settingsPage.links.calendar')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.optionCard} onPress={() => navigation.navigate('DisputeReport')}>
+            <Text style={styles.optionCardText}>{t('settingsPage.links.disputeReport')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.optionCard} onPress={() => navigation.navigate('EmailVerification')}>
+            <Text style={styles.optionCardText}>{t('settingsPage.links.emailVerification')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.optionCard} onPress={() => navigation.navigate('TwoFactorEntry')}>
+            <Text style={styles.optionCardText}>{t('settingsPage.links.twoFactorEntry')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.optionCard} onPress={() => navigation.navigate('SocialLogin')}>
+            <Text style={styles.optionCardText}>{t('settingsPage.links.socialLogin')}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     </ScrollView>
   );
 }

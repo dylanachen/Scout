@@ -10,6 +10,7 @@ import {
   Dimensions,
   Switch,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { api } from '../api/client';
 import useDemoActive from '../hooks/useDemoActive';
 
@@ -44,6 +45,7 @@ const DELIVERABLE_TYPES = ['Web Design', 'Branding', 'Presentation', 'UI/UX', 'L
 const SKILL_OPTIONS = ['Figma', 'React', 'Illustrator', 'Prototyping', 'Typography', 'Responsive', 'Keynote', 'Copywriting', 'iOS', 'CSS'];
 
 export default function PortfolioScreen() {
+  const { t } = useTranslation();
   const demoActive = useDemoActive();
   const [items, setItems] = useState<PortfolioItem[]>([]);
 
@@ -77,7 +79,7 @@ export default function PortfolioScreen() {
     if (!selectedType) return;
     const newItem: PortfolioItem = {
       id: String(Date.now()),
-      title: aiDesc || 'Untitled Project',
+      title: aiDesc || t('portfolioScreen.untitledProject'),
       type: selectedType,
       color: TYPE_COLORS[selectedType]?.color ?? '#64748b',
       skills: selectedSkills,
@@ -96,7 +98,7 @@ export default function PortfolioScreen() {
 
   return (
     <View style={s.container}>
-      <Text style={s.heading}>Portfolio</Text>
+      <Text style={s.heading}>{t('portfolioScreen.title')}</Text>
 
       <ScrollView contentContainerStyle={s.grid}>
         {items.map((item) => {
@@ -131,9 +133,9 @@ export default function PortfolioScreen() {
       <Modal visible={showAddModal} transparent animationType="slide">
         <View style={s.modalOverlay}>
           <View style={s.modal}>
-            <Text style={s.modalTitle}>Add to Portfolio</Text>
+            <Text style={s.modalTitle}>{t('portfolioScreen.addToPortfolio')}</Text>
 
-            <Text style={s.label}>Deliverable type</Text>
+            <Text style={s.label}>{t('portfolioScreen.deliverableType')}</Text>
             <View style={s.chipRow}>
               {DELIVERABLE_TYPES.map((t) => {
                 const active = selectedType === t;
@@ -150,7 +152,7 @@ export default function PortfolioScreen() {
               })}
             </View>
 
-            <Text style={s.label}>Skills</Text>
+            <Text style={s.label}>{t('portfolioScreen.skills')}</Text>
             <View style={s.chipRow}>
               {SKILL_OPTIONS.map((sk) => {
                 const active = selectedSkills.includes(sk);
@@ -166,10 +168,10 @@ export default function PortfolioScreen() {
               })}
             </View>
 
-            <Text style={s.label}>AI description</Text>
+            <Text style={s.label}>{t('portfolioScreen.aiDescription')}</Text>
             <TextInput
               style={s.input}
-              placeholder="Describe this portfolio piece..."
+              placeholder={t('portfolioScreen.describePlaceholder')}
               value={aiDesc}
               onChangeText={setAiDesc}
               multiline
@@ -177,16 +179,16 @@ export default function PortfolioScreen() {
             />
 
             <View style={s.toggleRow}>
-              <Text style={s.toggleLabel}>Share publicly?</Text>
+              <Text style={s.toggleLabel}>{t('portfolioScreen.sharePublicly')}</Text>
               <Switch value={sharePublic} onValueChange={setSharePublic} trackColor={{ true: '#1d6ecd' }} />
             </View>
 
             <View style={s.modalBtnRow}>
               <TouchableOpacity style={s.primaryBtn} onPress={handleAdd}>
-                <Text style={s.primaryBtnText}>Add to Portfolio</Text>
+                <Text style={s.primaryBtnText}>{t('portfolioScreen.addToPortfolio')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={s.ghostBtn} onPress={resetModal}>
-                <Text style={s.ghostBtnText}>Skip for now</Text>
+                <Text style={s.ghostBtnText}>{t('portfolioScreen.skipForNow')}</Text>
               </TouchableOpacity>
             </View>
           </View>

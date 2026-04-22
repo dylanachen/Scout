@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 
 const { width } = Dimensions.get('window');
 const AUTO_ADVANCE_MS = 5000;
@@ -18,20 +19,20 @@ const AUTO_ADVANCE_MS = 5000;
 const SLIDES = [
   {
     icon: '💬',
-    heading: 'Find your perfect match through a conversation, not a form',
-    description: 'Our AI interviews you like a human would — then finds clients who actually fit your style.',
+    headingKey: 'misc.onboardingCarousel.slide1.heading',
+    descriptionKey: 'misc.onboardingCarousel.slide1.description',
     color: '#dbeafe',
   },
   {
     icon: '🛡️',
-    heading: 'AI that watches your back while you work',
-    description: 'Scope creep detection, smart contract monitoring, and suggested responses — all in real time.',
+    headingKey: 'misc.onboardingCarousel.slide2.heading',
+    descriptionKey: 'misc.onboardingCarousel.slide2.description',
     color: '#fef3c7',
   },
   {
     icon: '💰',
-    heading: 'Protect your time, get paid what you\'re owed',
-    description: 'Automatic time tracking, AI-drafted invoices, and built-in change orders so nothing falls through the cracks.',
+    headingKey: 'misc.onboardingCarousel.slide3.heading',
+    descriptionKey: 'misc.onboardingCarousel.slide3.description',
     color: '#dcfce7',
   },
 ];
@@ -44,6 +45,7 @@ type AuthStackParamList = {
 };
 
 export default function OnboardingCarouselScreen() {
+  const { t } = useTranslation();
   const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
   const [current, setCurrent] = useState(0);
   const flatListRef = useRef<FlatList>(null);
@@ -79,7 +81,7 @@ export default function OnboardingCarouselScreen() {
       {!isLast && (
         <View style={styles.skipWrap}>
           <TouchableOpacity onPress={() => navigation.replace('SignUp')} hitSlop={12}>
-            <Text style={styles.skipText}>Skip</Text>
+            <Text style={styles.skipText}>{t('misc.onboardingCarousel.skip')}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -97,8 +99,8 @@ export default function OnboardingCarouselScreen() {
             <View style={[styles.iconCircle, { backgroundColor: item.color }]}>
               <Text style={styles.icon}>{item.icon}</Text>
             </View>
-            <Text style={styles.heading}>{item.heading}</Text>
-            <Text style={styles.description}>{item.description}</Text>
+            <Text style={styles.heading}>{t(item.headingKey)}</Text>
+            <Text style={styles.description}>{t(item.descriptionKey)}</Text>
           </View>
         )}
       />
@@ -119,13 +121,13 @@ export default function OnboardingCarouselScreen() {
               style={styles.primaryBtn}
               onPress={() => navigation.replace('SignUp')}
             >
-              <Text style={styles.primaryBtnText}>Get Started</Text>
+              <Text style={styles.primaryBtnText}>{t('misc.onboardingCarousel.getStarted')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.ghostBtn}
               onPress={() => navigation.replace('Login')}
             >
-              <Text style={styles.ghostBtnText}>Log In</Text>
+              <Text style={styles.ghostBtnText}>{t('auth.logIn')}</Text>
             </TouchableOpacity>
           </View>
         ) : (

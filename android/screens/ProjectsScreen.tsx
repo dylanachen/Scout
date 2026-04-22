@@ -1,16 +1,23 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
-  ScrollView,
+  FlatList,
   TouchableOpacity,
   RefreshControl,
   StyleSheet,
-  Alert,
+  ActivityIndicator,
+  Share,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { api } from '../api/client';
 import useDemoActive from '../hooks/useDemoActive';
+import { useAppTheme } from '../context/ThemeContext';
+import EmptyState from '../components/states/EmptyState';
+import ErrorState from '../components/states/ErrorState';
+import Skeleton from '../components/states/Skeleton';
 
 type Project = {
   id: string;
@@ -28,12 +35,12 @@ const DEMO_PROJECTS: Project[] = [
 ];
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
-  active: { bg: '#dcfce7', text: '#15803d', label: 'Active' },
-  completed: { bg: '#dbeafe', text: '#1d6ecd', label: 'Completed' },
-  paused: { bg: '#fef3c7', text: '#d97706', label: 'Paused' },
+  active: { bg: '#dcfce7', text: '#15803d', label: 'projectsScreen.status.active' },
+  completed: { bg: '#dbeafe', text: '#1d6ecd', label: 'projectsScreen.status.completed' },
+  paused: { bg: '#fef3c7', text: '#d97706', label: 'projectsScreen.status.paused' },
 };
 
-function ProjectCard({ project }: { project: Project }) {
+function ProjectCard({ project, t }: { project: Project; t: (key: string) => string }) {
   const navigation = useNavigation<any>();
   const st = STATUS_STYLES[project.status] ?? STATUS_STYLES.active;
 
@@ -45,7 +52,7 @@ function ProjectCard({ project }: { project: Project }) {
           <Text style={styles.cardClient}>{project.clientName}</Text>
         </View>
         <View style={[styles.badge, { backgroundColor: st.bg }]}>
-          <Text style={[styles.badgeText, { color: st.text }]}>{st.label}</Text>
+          <Text style={[styles.badgeText, { color: st.text }]}>{t(st.label)}</Text>
         </View>
       </View>
 
@@ -60,30 +67,71 @@ function ProjectCard({ project }: { project: Project }) {
         style={styles.chatBtn}
         onPress={() => navigation.navigate('ProjectChat', { projectId: project.id, projectName: project.name })}
       >
-        <Text style={styles.chatBtnText}>Open Chat</Text>
+        <Text style={styles.chatBtnText}>{t('projectsScreen.openChat')}</Text>
       </TouchableOpacity>
     </View>
   );
 }
 
 export default function ProjectsScreen() {
+  const { t } = useTranslation();
   const navigation = useNavigation<any>();
+  const { colors } = useAppTheme();
   const demoActive = useDemoActive();
   const [refreshing, setRefreshing] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [visibleCount, setVisibleCount] = useState(8);
+  const [statusFilter, setStatusFilter] = useState<'all' | Project['status']>('all');
+  const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
+
+  const loadBookmarks = useCallback(async () => {
+    try {
+      const raw = await AsyncStorage.getItem('scout_bookmarked_projects');
+      const parsed = raw ? JSON.parse(raw) : [];
+      setBookmarkedIds(new Set(Array.isArray(parsed) ? parsed : []));
+    } catch {
+      setBookmarkedIds(new Set());
+    }
+  }, []);
+
+  const persistBookmarks = useCallback(async (next: Set<string>) => {
+    await AsyncStorage.setItem('scout_bookmarked_projects', JSON.stringify(Array.from(next)));
+  }, []);
+
+  const toggleBookmark = useCallback(
+    async (projectId: string) => {
+      const next = new Set(bookmarkedIds);
+      if (next.has(projectId)) next.delete(projectId);
+      else next.add(projectId);
+      setBookmarkedIds(next);
+      await persistBookmarks(next);
+    },
+    [bookmarkedIds, persistBookmarks],
+  );
 
   const fetchProjects = useCallback(async () => {
+    setError('');
     if (demoActive) {
       setProjects(DEMO_PROJECTS);
+      setLoading(false);
       return;
     }
     try {
       const { data } = await api.get('/projects');
       if (Array.isArray(data)) setProjects(data);
-    } catch { /* backend unavailable */ }
-  }, [demoActive]);
+    } catch {
+      setError(t('projectsScreen.failedLoad'));
+    } finally {
+      setLoading(false);
+    }
+  }, [demoActive, t]);
 
-  useEffect(() => { fetchProjects(); }, [fetchProjects]);
+  useEffect(() => {
+    fetchProjects();
+    loadBookmarks();
+  }, [fetchProjects, loadBookmarks]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -91,39 +139,107 @@ export default function ProjectsScreen() {
     setRefreshing(false);
   }, [fetchProjects]);
 
-  if (projects.length === 0) {
+  const filtered = useMemo(
+    () => (statusFilter === 'all' ? projects : projects.filter((project) => project.status === statusFilter)),
+    [projects, statusFilter],
+  );
+  const visibleProjects = filtered.slice(0, visibleCount);
+  const hasMore = filtered.length > visibleProjects.length;
+
+  if (loading) {
     return (
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.emptyWrap}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#1d6ecd" />}
-      >
-        <View style={styles.emptyBox}>
-          <Text style={styles.emptyTitle}>No projects yet</Text>
-          <Text style={styles.emptyDesc}>Your active projects will appear here.</Text>
-        </View>
-      </ScrollView>
+      <View style={[styles.container, { backgroundColor: colors.background, padding: 16, gap: 10 }]}>
+        <Skeleton height={90} />
+        <Skeleton height={90} />
+        <Skeleton height={90} />
+      </View>
     );
   }
 
   return (
     <View style={{ flex: 1 }}>
-      <ScrollView
-        style={styles.container}
+      <FlatList
+        data={visibleProjects}
+        keyExtractor={(item) => item.id}
+        style={[styles.container, { backgroundColor: colors.background }]}
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#1d6ecd" />}
-      >
-        <Text style={styles.heading}>Projects</Text>
-        <Text style={styles.count}>{projects.length} project{projects.length !== 1 ? 's' : ''}</Text>
-
-        {projects.map((p) => (
-          <ProjectCard key={p.id} project={p} />
-        ))}
-      </ScrollView>
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+        onEndReachedThreshold={0.25}
+        onEndReached={() => {
+          if (hasMore) setVisibleCount((prev) => prev + 6);
+        }}
+        ListHeaderComponent={(
+          <View>
+            <Text style={[styles.heading, { color: colors.text }]}>{t('projectsScreen.title')}</Text>
+            <Text style={[styles.count, { color: colors.textMuted }]}>
+              {t('projectsScreen.projectCount', { count: filtered.length })}
+            </Text>
+            <View style={styles.filterRow}>
+              {(['all', 'active', 'completed', 'paused'] as const).map((status) => (
+                <TouchableOpacity
+                  key={status}
+                  style={[
+                    styles.filterChip,
+                    { borderColor: colors.border, backgroundColor: statusFilter === status ? colors.primary : colors.surface },
+                  ]}
+                  onPress={() => setStatusFilter(status)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('projectsScreen.filterLabel', { status })}
+                >
+                  <Text style={{ color: statusFilter === status ? '#fff' : colors.text, fontSize: 12, fontWeight: '600' }}>
+                    {t(`projectsScreen.filter.${status}`)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {error ? <ErrorState message={error} onRetry={fetchProjects} /> : null}
+            {!filtered.length ? <EmptyState title={t('projectsScreen.emptyTitle')} subtitle={t('projectsScreen.emptySubtitle')} /> : null}
+          </View>
+        )}
+        ListFooterComponent={
+          hasMore ? (
+            <View style={{ paddingVertical: 12, alignItems: 'center' }}>
+              <ActivityIndicator color={colors.primary} />
+            </View>
+          ) : null
+        }
+        renderItem={({ item: project }) => (
+          <View>
+            <ProjectCard project={project} t={t} />
+            <View style={styles.secondaryActions}>
+              <TouchableOpacity
+                style={[styles.secondaryBtn, { borderColor: colors.border, backgroundColor: colors.surface }]}
+                onPress={() => toggleBookmark(project.id)}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  bookmarkedIds.has(project.id)
+                    ? t('projectsScreen.removeBookmark')
+                    : t('projectsScreen.bookmarkProject')
+                }
+              >
+                <Text style={{ color: colors.text, fontSize: 12, fontWeight: '600' }}>
+                  {bookmarkedIds.has(project.id) ? t('projectsScreen.bookmarked') : t('projectsScreen.bookmark')}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.secondaryBtn, { borderColor: colors.border, backgroundColor: colors.surface }]}
+                onPress={() => Share.share({ message: t('projectsScreen.shareMessage', { name: project.name }) })}
+                accessibilityRole="button"
+                accessibilityLabel={t('projectsScreen.shareLabel', { name: project.name })}
+                accessibilityHint={t('projectsScreen.shareHint')}
+              >
+                <Text style={{ color: colors.text, fontSize: 12, fontWeight: '600' }}>{t('projectsScreen.share')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+      />
       <TouchableOpacity
         style={styles.fab}
         activeOpacity={0.85}
         onPress={() => navigation.navigate('Onboarding')}
+        accessibilityRole="button"
+        accessibilityLabel={t('projectsScreen.startNewProject')}
       >
         <Text style={styles.fabText}>+</Text>
       </TouchableOpacity>
@@ -136,6 +252,8 @@ const styles = StyleSheet.create({
   content: { padding: 16, paddingBottom: 32 },
   heading: { fontSize: 22, fontWeight: '700', color: '#0f1623', marginBottom: 4 },
   count: { fontSize: 13, color: '#9aa0ae', marginBottom: 16 },
+  filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
+  filterChip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
   card: {
     backgroundColor: '#fff',
     borderRadius: 14,
@@ -176,6 +294,8 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: 16, fontWeight: '600', color: '#0f1623', marginBottom: 6 },
   emptyDesc: { fontSize: 13, color: '#9aa0ae', textAlign: 'center' },
+  secondaryActions: { flexDirection: 'row', gap: 10, marginTop: -4, marginBottom: 12 },
+  secondaryBtn: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 },
   fab: {
     position: 'absolute',
     bottom: 24,

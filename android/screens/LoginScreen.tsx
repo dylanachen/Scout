@@ -14,6 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useTranslation } from 'react-i18next';
 import { authApi } from '../api/client';
 import {
   DEMO_SESSION_KEY,
@@ -27,6 +28,7 @@ type AuthStackParamList = {
   Login: undefined;
   SignUp: undefined;
   ForgotPassword: undefined;
+  SocialLogin: undefined;
 };
 
 type Props = { onAuthed: () => void };
@@ -41,6 +43,7 @@ function formatAuthError(err: unknown): string | null {
 }
 
 export default function LoginScreen({ onAuthed }: Props) {
+  const { t } = useTranslation();
   const demo = isDemoMode();
   const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
   const [email, setEmail] = useState('');
@@ -71,7 +74,7 @@ export default function LoginScreen({ onAuthed }: Props) {
       onAuthed();
     } catch (err) {
       await AsyncStorage.removeItem(DEMO_SESSION_KEY);
-      setBanner(formatAuthError(err) ?? 'Incorrect email or password');
+      setBanner(formatAuthError(err) ?? t('auth.incorrectCredentials'));
     } finally {
       setLoading(false);
     }
@@ -91,7 +94,7 @@ export default function LoginScreen({ onAuthed }: Props) {
       onAuthed();
     } catch (err) {
       await AsyncStorage.removeItem(DEMO_SESSION_KEY);
-      setBanner(formatAuthError(err) ?? 'Incorrect email or password');
+      setBanner(formatAuthError(err) ?? t('auth.incorrectCredentials'));
     } finally {
       setLoading(false);
     }
@@ -111,7 +114,7 @@ export default function LoginScreen({ onAuthed }: Props) {
       onAuthed();
     } catch (err) {
       await AsyncStorage.removeItem(DEMO_SESSION_KEY);
-      setBanner(formatAuthError(err) ?? 'Incorrect email or password');
+      setBanner(formatAuthError(err) ?? t('auth.incorrectCredentials'));
     } finally {
       setLoading(false);
     }
@@ -128,14 +131,14 @@ export default function LoginScreen({ onAuthed }: Props) {
         </View>
         <View style={styles.hintBox}>
           <Text style={styles.hintText}>
-            <Text style={styles.hintBold}>Quick demo</Text> (password <Text style={styles.hintBold}>test</Text>): freelancer{' '}
+            <Text style={styles.hintBold}>{t('auth.quickDemo')}</Text> (password <Text style={styles.hintBold}>test</Text>): freelancer{' '}
             <Text style={styles.hintBold}>freelancer</Text> · client <Text style={styles.hintBold}>client</Text>. Local mock data.
           </Text>
         </View>
         {demo ? (
           <View style={styles.demoBox}>
             <Text style={styles.demoText}>
-              <Text style={styles.demoBold}>Demo mode</Text> — no backend. Use any email/password, or:
+              <Text style={styles.demoBold}>{t('auth.demoMode')}</Text> — {t('auth.noBackend')}. Use any email/password, or:
             </Text>
             <View style={styles.demoBtnRow}>
               <TouchableOpacity
@@ -143,16 +146,16 @@ export default function LoginScreen({ onAuthed }: Props) {
                 onPress={exploreFreelancer}
                 disabled={loading}
               >
-                <Text style={styles.demoBtnText}>Freelancer</Text>
+                <Text style={styles.demoBtnText}>{t('auth.roleFreelancer')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.demoBtn, styles.demoBtnHalf]} onPress={exploreClient} disabled={loading}>
-                <Text style={styles.demoBtnText}>Client</Text>
+                <Text style={styles.demoBtnText}>{t('auth.roleClient')}</Text>
               </TouchableOpacity>
             </View>
           </View>
         ) : null}
-        <Text style={styles.title}>Welcome back</Text>
-        <Text style={styles.sub}>Sign in to your workspace</Text>
+        <Text style={styles.title}>{t('auth.welcomeBack')}</Text>
+        <Text style={styles.sub}>{t('auth.signInWorkspace')}</Text>
 
         {banner ? (
           <View style={styles.bannerWrap}>
@@ -160,7 +163,7 @@ export default function LoginScreen({ onAuthed }: Props) {
           </View>
         ) : null}
 
-        <Text style={styles.label}>Email or username</Text>
+        <Text style={styles.label}>{t('auth.emailOrUsername')}</Text>
         <TextInput
           style={styles.input}
           autoCapitalize="none"
@@ -170,7 +173,7 @@ export default function LoginScreen({ onAuthed }: Props) {
           placeholder="freelancer, client, or email"
           placeholderTextColor="#9aa0ae"
         />
-        <Text style={styles.label}>Password</Text>
+        <Text style={styles.label}>{t('auth.password')}</Text>
         <View style={styles.pwRow}>
           <TextInput
             style={[styles.input, { flex: 1, marginBottom: 0 }]}
@@ -181,13 +184,13 @@ export default function LoginScreen({ onAuthed }: Props) {
             placeholderTextColor="#9aa0ae"
           />
           <Pressable onPress={() => setShowPw((s) => !s)} style={styles.showBtn}>
-            <Text style={styles.showBtnText}>{showPw ? 'Hide' : 'Show'}</Text>
+            <Text style={styles.showBtnText}>{showPw ? t('auth.hide') : t('auth.show')}</Text>
           </Pressable>
         </View>
         <View style={styles.forgotRow}>
           <Text style={styles.forgotSpacer} />
           <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')} hitSlop={8}>
-            <Text style={styles.forgotLink}>Forgot password?</Text>
+            <Text style={styles.forgotLink}>{t('auth.forgotPassword')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -195,14 +198,22 @@ export default function LoginScreen({ onAuthed }: Props) {
           {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.btnText}>Log In</Text>
+            <Text style={styles.btnText}>{t('auth.logIn')}</Text>
           )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.btn, { marginTop: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e6ed' }]}
+          onPress={() => navigation.navigate('SocialLogin')}
+          accessibilityRole="button"
+          accessibilityLabel={t('auth.continueGoogle')}
+        >
+          <Text style={[styles.btnText, { color: '#0f1623' }]}>{t('auth.continueGoogle')}</Text>
         </TouchableOpacity>
 
         <View style={styles.switchRow}>
-          <Text style={styles.switchText}>Don&apos;t have an account? </Text>
+          <Text style={styles.switchText}>{t('auth.noAccount')} </Text>
           <TouchableOpacity onPress={() => navigation.navigate('SignUp')} hitSlop={8}>
-            <Text style={styles.switchLink}>Sign up</Text>
+            <Text style={styles.switchLink}>{t('auth.signUp')}</Text>
           </TouchableOpacity>
         </View>
       </View>

@@ -2,6 +2,8 @@ import { useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { computeTotals, getInvoices, upsertInvoice } from '../utils/invoiceStorage';
 import { formatShortDate } from '../utils/dashboard';
+import { downloadCsv } from '../utils/exportCsv';
+import { showToast } from '../utils/toast';
 
 const FILTERS = ['all', 'draft', 'sent', 'paid', 'overdue'];
 
@@ -285,6 +287,17 @@ function InvoiceDetailModal({ inv, onClose, onMarkPaid, onReminder }) {
   );
 }
 
+const toolbarBtn = {
+  padding: '8px 12px',
+  borderRadius: 8,
+  border: '1px solid var(--color-border)',
+  background: 'var(--color-surface)',
+  fontSize: 13,
+  fontWeight: 600,
+  cursor: 'pointer',
+  fontFamily: 'var(--font-sans)',
+};
+
 export default function Invoices() {
   const [tick, setTick] = useState(0);
   const [filter, setFilter] = useState('all');
@@ -324,9 +337,41 @@ export default function Invoices() {
 
   return (
     <div className="main-scroll" style={{ flex: 1, overflowY: 'auto', padding: '20px 20px 88px' }}>
-      <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 6px', letterSpacing: '-0.03em' }}>Invoices</h1>
-        <p style={{ fontSize: 13, color: 'var(--color-text-3)', margin: 0 }}>All invoices across your projects.</p>
+      <div style={{ marginBottom: 20, display: 'flex', gap: 10, justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <div>
+          <h1 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 6px', letterSpacing: '-0.03em' }}>Invoices</h1>
+          <p style={{ fontSize: 13, color: 'var(--color-text-3)', margin: 0 }}>All invoices across your projects.</p>
+        </div>
+        <div className="scout-no-print" style={{ display: 'flex', gap: 8 }}>
+          <button
+            type="button"
+            onClick={() => {
+              const exportRows = rows.map((inv) => {
+                const { total } = computeTotals(inv.lineItems ?? [], inv.taxPercent);
+                return {
+                  invoice: inv.invoiceNumber,
+                  client: inv.clientName,
+                  project: inv.projectName,
+                  status: getDisplayStatus(inv),
+                  due: inv.dueDate,
+                  total,
+                };
+              });
+              downloadCsv(`scout-invoices-${Date.now()}.csv`, exportRows);
+              showToast('Invoices CSV downloaded', 'success');
+            }}
+            style={toolbarBtn}
+          >
+            Export CSV
+          </button>
+          <button
+            type="button"
+            onClick={() => window.print()}
+            style={toolbarBtn}
+          >
+            Print
+          </button>
+        </div>
       </div>
 
       {toast ? (

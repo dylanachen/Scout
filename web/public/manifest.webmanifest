@@ -1,0 +1,19 @@
+{
+  "name": "Scout",
+  "short_name": "Scout",
+  "description": "Smart matching, contracts, invoices, and project ops for freelancers and clients.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1d6ecd",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

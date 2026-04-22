@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,10 +6,14 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  RefreshControl,
+  Share,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { api } from '../api/client';
 import useDemoActive from '../hooks/useDemoActive';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type MatchData = {
   id: string;
@@ -78,11 +82,11 @@ const PORTFOLIO_COLORS = [
 
 type SortKey = 'bestMatch' | 'skillFit' | 'timeline' | 'budget';
 
-const SORT_OPTIONS: { key: SortKey; label: string }[] = [
-  { key: 'bestMatch', label: 'Best Match' },
-  { key: 'skillFit', label: 'Skill Fit' },
-  { key: 'timeline', label: 'Timeline' },
-  { key: 'budget', label: 'Budget' },
+const SORT_OPTIONS: { key: SortKey; labelKey: string }[] = [
+  { key: 'bestMatch', labelKey: 'matchResultsScreen.sort.bestMatch' },
+  { key: 'skillFit', labelKey: 'matchResultsScreen.sort.skillFit' },
+  { key: 'timeline', labelKey: 'matchResultsScreen.sort.timeline' },
+  { key: 'budget', labelKey: 'matchResultsScreen.sort.budget' },
 ];
 
 function scoreColor(v: number) {
@@ -125,10 +129,14 @@ function MatchCard({
   match,
   viewerRole,
   colorIndex,
+  onViewProfile,
+  t,
 }: {
   match: MatchData;
   viewerRole: 'freelancer' | 'client';
   colorIndex: number;
+  onViewProfile?: (match: MatchData) => void;
+  t: (key: string, options?: Record<string, unknown>) => string;
 }) {
   const [interestSent, setInterestSent] = useState(false);
   const [passed, setPassed] = useState(false);
@@ -172,8 +180,8 @@ function MatchCard({
                 ]}
               >
                 {match.availability === 'now'
-                  ? 'Available now'
-                  : 'Available soon'}
+                  ? t('matchResultsScreen.availableNow')
+                  : t('matchResultsScreen.availableSoon')}
               </Text>
             </View>
           )}
@@ -182,18 +190,18 @@ function MatchCard({
           <Text style={[styles.scorePercent, { color: sc }]}>
             {match.overallScore}%
           </Text>
-          <Text style={styles.scoreMatchLabel}>match</Text>
+          <Text style={styles.scoreMatchLabel}>{t('matchResultsScreen.matchLabel')}</Text>
         </View>
       </View>
 
       <View style={styles.scoresGrid}>
-        <ScoreBar label="Skill Fit" value={match.scores.skillFit} />
+        <ScoreBar label={t('matchResultsScreen.skillFit')} value={match.scores.skillFit} />
         <ScoreBar
-          label="Communication Style"
+          label={t('matchResultsScreen.communicationStyle')}
           value={match.scores.communication}
         />
-        <ScoreBar label="Timeline Match" value={match.scores.timeline} />
-        <ScoreBar label="Budget Alignment" value={match.scores.budget} />
+        <ScoreBar label={t('matchResultsScreen.timelineMatch')} value={match.scores.timeline} />
+        <ScoreBar label={t('matchResultsScreen.budgetAlignment')} value={match.scores.budget} />
       </View>
 
       <View style={styles.portfolioRow}>
@@ -210,20 +218,23 @@ function MatchCard({
       {viewerRole === 'freelancer' && (
         <View style={styles.reputationBadge}>
           <Text style={styles.reputationText}>
-            {'\u2B50'} {match.clientRating.toFixed(1)} avg client rating
+            {'\u2B50'} {match.clientRating.toFixed(1)} {t('matchResultsScreen.avgClientRating')}
           </Text>
         </View>
       )}
 
       <TouchableOpacity
-        onPress={() =>
-          Alert.alert(
-            match.name,
-            `Role: ${match.role}\nSpecialty: ${match.specialty}\nLocation: ${match.location}\n\nOverall Match: ${match.overallScore}%\nSkill Fit: ${match.scores.skillFit}%\nCommunication: ${match.scores.communication}%\nTimeline: ${match.scores.timeline}%\nBudget: ${match.scores.budget}%\n\nClient Rating: ${match.clientRating.toFixed(1)}/5.0`,
-          )
-        }
+        onPress={() => {
+          if (onViewProfile) onViewProfile(match);
+          else {
+            Alert.alert(
+              match.name,
+              `Role: ${match.role}\nSpecialty: ${match.specialty}\nLocation: ${match.location}\n\nOverall Match: ${match.overallScore}%\nSkill Fit: ${match.scores.skillFit}%\nCommunication: ${match.scores.communication}%\nTimeline: ${match.scores.timeline}%\nBudget: ${match.scores.budget}%\n\nClient Rating: ${match.clientRating.toFixed(1)}/5.0`,
+            );
+          }
+        }}
       >
-        <Text style={styles.viewProfile}>View full profile</Text>
+        <Text style={styles.viewProfile}>{t('matchResultsScreen.viewFullProfile')}</Text>
       </TouchableOpacity>
 
       <View style={styles.actionRow}>
@@ -233,7 +244,7 @@ function MatchCard({
           onPress={() => setInterestSent(true)}
         >
           <Text style={[styles.interestedText, disabled && styles.btnTextOff]}>
-            {interestSent ? 'Interest sent' : "I'm interested"}
+            {interestSent ? t('matchResultsScreen.interestSent') : t('matchResultsScreen.imInterested')}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -242,7 +253,7 @@ function MatchCard({
           onPress={() => setPassed(true)}
         >
           <Text style={[styles.passText, disabled && styles.btnTextOff]}>
-            {passed ? 'Passed' : 'Pass'}
+            {passed ? t('matchResultsScreen.passed') : t('matchResultsScreen.pass')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -251,8 +262,7 @@ function MatchCard({
         <View style={styles.warningBanner}>
           <Text style={styles.warningText}>
             {'\u26A0\uFE0F'}{' '}
-            <Text style={{ fontWeight: '700' }}>Heads up:</Text> This timeline
-            may be tight for the described scope
+            <Text style={{ fontWeight: '700' }}>{t('matchResultsScreen.headsUp')}</Text> {t('matchResultsScreen.timelineTight')}
           </Text>
         </View>
       )}
@@ -261,13 +271,31 @@ function MatchCard({
 }
 
 export default function MatchResultsScreen() {
+  const { t } = useTranslation();
   const navigation = useNavigation<any>();
   const demoActive = useDemoActive();
   const [sortBy, setSortBy] = useState<SortKey>('bestMatch');
+  const [minimumRating, setMinimumRating] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(6);
   const [viewerRole] = useState<'freelancer' | 'client'>('freelancer');
   const [matchData, setMatchData] = useState<MatchData[]>([]);
+  const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const raw = await AsyncStorage.getItem('scout_bookmarked_projects');
+      if (cancelled) return;
+      const parsed = raw ? JSON.parse(raw) : [];
+      setBookmarkedIds(new Set(Array.isArray(parsed) ? parsed : []));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const fetchMatches = useCallback(async () => {
     if (demoActive) {
       setMatchData(MOCK_MATCHES);
       return;
@@ -281,6 +309,16 @@ export default function MatchResultsScreen() {
     })();
     return () => { cancelled = true; };
   }, [demoActive]);
+
+  useEffect(() => {
+    fetchMatches();
+  }, [fetchMatches]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchMatches();
+    setRefreshing(false);
+  }, [fetchMatches]);
 
   const sorted = useMemo(() => {
     const arr = [...matchData];
@@ -297,8 +335,9 @@ export default function MatchResultsScreen() {
       default:
         arr.sort((a, b) => b.overallScore - a.overallScore);
     }
-    return arr;
-  }, [sortBy]);
+    return arr.filter((item) => item.clientRating >= minimumRating);
+  }, [matchData, sortBy, minimumRating]);
+  const visibleMatches = sorted.slice(0, visibleCount);
 
   if (matchData.length === 0) {
     return (
@@ -307,14 +346,14 @@ export default function MatchResultsScreen() {
           <Text style={{ fontSize: 32, color: '#9aa0ae' }}>{'\u2026'}</Text>
         </View>
         <Text style={styles.emptyTitle}>
-          We're still building your matches
+          {t('matchResultsScreen.buildingMatches')}
         </Text>
-        <Text style={styles.emptyDesc}>Check back soon</Text>
+        <Text style={styles.emptyDesc}>{t('matchResultsScreen.checkBackSoon')}</Text>
         <TouchableOpacity
           style={styles.emptyBtn}
           onPress={() => navigation.navigate('Dashboard')}
         >
-          <Text style={styles.emptyBtnText}>Go to Dashboard</Text>
+          <Text style={styles.emptyBtnText}>{t('matchResultsScreen.goToDashboard')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -324,9 +363,10 @@ export default function MatchResultsScreen() {
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.scrollContent}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#1d6ecd" />}
     >
-      <Text style={styles.heading}>Your Matches</Text>
-      <Text style={styles.count}>{sorted.length} freelancers matched</Text>
+      <Text style={styles.heading}>{t('matchResultsScreen.title')}</Text>
+      <Text style={styles.count}>{t('matchResultsScreen.count', { count: sorted.length })}</Text>
 
       <View style={styles.sortRow}>
         {SORT_OPTIONS.map((opt) => (
@@ -344,20 +384,78 @@ export default function MatchResultsScreen() {
                 sortBy === opt.key && styles.sortChipTextActive,
               ]}
             >
-              {opt.label}
+              {t(opt.labelKey)}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <View style={styles.sortRow}>
+        {[0, 4, 4.5].map((rating) => (
+          <TouchableOpacity
+            key={rating}
+            style={[styles.sortChip, minimumRating === rating && styles.sortChipActive]}
+            onPress={() => setMinimumRating(rating)}
+          >
+            <Text style={[styles.sortChipText, minimumRating === rating && styles.sortChipTextActive]}>
+              {rating === 0 ? t('matchResultsScreen.anyRating') : t('matchResultsScreen.ratingPlus', { rating })}
             </Text>
           </TouchableOpacity>
         ))}
       </View>
 
-      {sorted.map((m, idx) => (
-        <MatchCard
-          key={m.id}
-          match={m}
-          viewerRole={viewerRole}
-          colorIndex={idx}
-        />
+      {visibleMatches.map((m, idx) => (
+        <View key={m.id}>
+          <MatchCard
+            match={m}
+            viewerRole={viewerRole}
+            colorIndex={idx}
+            t={t}
+            onViewProfile={(selectedMatch) => {
+              navigation.navigate('PublicProfile', {
+                title: t('settingsPage.links.publicProfile'),
+                description: t('matchResultsScreen.publicProfileDesc'),
+                profile: {
+                  name: selectedMatch.name,
+                  role: `${selectedMatch.role} · ${selectedMatch.specialty}`,
+                  avatarUrl: null,
+                },
+              });
+            }}
+          />
+          <View style={{ flexDirection: 'row', gap: 10, marginTop: -2, marginBottom: 14 }}>
+            <TouchableOpacity
+              style={{ borderWidth: 1, borderColor: '#e2e6ed', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: '#fff' }}
+              onPress={async () => {
+                const next = new Set(bookmarkedIds);
+                if (next.has(m.id)) next.delete(m.id);
+                else next.add(m.id);
+                setBookmarkedIds(next);
+                await AsyncStorage.setItem('scout_bookmarked_projects', JSON.stringify(Array.from(next)));
+              }}
+            >
+              <Text style={{ color: '#4a5568', fontSize: 12, fontWeight: '600' }}>
+                {bookmarkedIds.has(m.id) ? t('projectsScreen.bookmarked') : t('projectsScreen.bookmark')}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{ borderWidth: 1, borderColor: '#e2e6ed', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: '#fff' }}
+              onPress={() => Share.share({ message: t('matchResultsScreen.shareMessage', { name: m.name, score: m.overallScore }) })}
+            >
+              <Text style={{ color: '#4a5568', fontSize: 12, fontWeight: '600' }}>{t('projectsScreen.share')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       ))}
+      {sorted.length > visibleCount ? (
+        <TouchableOpacity
+          style={styles.emptyBtn}
+          onPress={() => setVisibleCount((prev) => prev + 6)}
+          accessibilityRole="button"
+          accessibilityLabel={t('matchResultsScreen.loadMoreMatches')}
+        >
+          <Text style={styles.emptyBtnText}>{t('matchResultsScreen.loadMore')}</Text>
+        </TouchableOpacity>
+      ) : null}
     </ScrollView>
   );
 }

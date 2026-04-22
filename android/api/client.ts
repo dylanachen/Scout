@@ -1,6 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { demoAdapter, shouldUseDemoAdapter } from './demoAdapter';
+import { showGlobalToast } from '../context/ToastContext';
 
 const baseURL = process.env.EXPO_PUBLIC_API_URL ?? 'http://10.0.2.2:8000';
 
@@ -18,6 +19,14 @@ api.interceptors.request.use(async (config) => {
   }
   return config;
 });
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    showGlobalToast(error?.response?.data?.detail || error?.message || 'Request failed');
+    return Promise.reject(error);
+  },
+);
 
 export type MeUser = {
   id: number;
