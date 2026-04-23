@@ -169,7 +169,6 @@ export default function MatchCard({
   interestSent,
   passed,
   viewerRole,
-  footerActions = null,
 }) {
   const {
     name,
@@ -297,15 +296,6 @@ export default function MatchCard({
           {passed ? 'Passed' : 'Pass'}
         </button>
       </div>
-
-      {footerActions ? (
-        <div style={{
-          display: 'flex', gap: 8, flexWrap: 'wrap',
-          paddingTop: 12, borderTop: '1px solid var(--color-border)',
-        }}>
-          {footerActions}
-        </div>
-      ) : null}
 
       {isFreelancer && timelineTightWarning ? (
         <div

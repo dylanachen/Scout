@@ -1,0 +1,24 @@
+# Root Vite app
+node_modules/
+dist/
+.vite/
+.env
+.env.local
+.env.*.local
+
+# Expo / React Native (mirrors former frontend/android)
+android/node_modules/
+android/.expo/
+android/dist/
+android/web-build/
+
+# Python API (nested `backend/backend/`)
+backend/backend/__pycache__/
+backend/backend/**/*.pyc
+backend/backend/.venv/
+backend/backend/venv/
+
+# Logs
+*.log
+npm-debug.*
+.DS_Store

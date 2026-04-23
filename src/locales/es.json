@@ -1,0 +1,117 @@
+{
+  "common": {
+    "loading": "Cargando...",
+    "dashboard": "Panel",
+    "settings": "Configuración",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "retry": "Reintentar"
+  },
+  "projects": {
+    "title": "Proyectos",
+    "subtitle": "Todo en lo que estás trabajando ahora mismo.",
+    "newProject": "Nuevo proyecto",
+    "empty": "Aún no hay proyectos. Empieza uno para verlo aquí.",
+    "pipeline": "Pipeline",
+    "filters": {
+      "statusAria": "Filtrar proyectos por estado",
+      "sortAria": "Ordenar proyectos",
+      "allStatuses": "Todos los estados",
+      "inProgress": "En curso",
+      "needsClient": "Necesita cliente",
+      "completed": "Completados",
+      "sortDeadline": "Orden: Fecha límite",
+      "sortName": "Orden: Nombre",
+      "sortRate": "Orden: Tarifa"
+    },
+    "loadMore": "Cargar más",
+    "startProjectAria": "Iniciar un nuevo proyecto"
+  },
+  "matches": {
+    "title": "Tus coincidencias",
+    "none": "Aún no hay coincidencias",
+    "sortBy": "Ordenar por",
+    "minRating": "Calif. mín.",
+    "skill": "Habilidad",
+    "loadMore": "Cargar más coincidencias",
+    "goToDashboard": "Ir al panel",
+    "countFound_one": "{{count}} coincidencia encontrada",
+    "countFound_other": "{{count}} coincidencias encontradas",
+    "sorts": {
+      "bestMatch": "Mejor coincidencia",
+      "skillFit": "Habilidades",
+      "timeline": "Tiempo",
+      "budget": "Presupuesto"
+    },
+    "any": "Cualquiera",
+    "buildingTitle": "Seguimos construyendo tus coincidencias — vuelve pronto",
+    "buildingBody": "Cuando encontremos personas que encajen con tus habilidades y preferencias, aparecerán aquí.",
+    "skillPlaceholder": "p. ej. diseño"
+  },
+  "dashboardPage": {
+    "pipelineView": "Vista de pipeline",
+    "startProject": "Iniciar un nuevo proyecto",
+    "activeProjects": "Proyectos activos",
+    "viewAll": "Ver todo",
+    "pendingMatches": "Coincidencias pendientes",
+    "recentActivity": "Actividad reciente",
+    "viewAllNotifications": "Ver todas las notificaciones",
+    "loading": "Cargando panel...",
+    "noActiveProjects": "Sin proyectos activos",
+    "noNotifications": "Sin notificaciones.",
+    "refresh": "Actualizar",
+    "metrics": {
+      "activeProjects": "Proyectos activos",
+      "hoursThisWeek": "Horas esta semana",
+      "pendingInvoices": "Facturas pendientes",
+      "unreadMessages": "Mensajes no leídos",
+      "projectsUnit": "proyectos",
+      "hoursUnit": "hrs",
+      "totalSuffix": "{{total}} en total"
+    },
+    "matchesActions": {
+      "accept": "Aceptar",
+      "pass": "Pasar"
+    },
+    "fabAria": "Iniciar un nuevo proyecto"
+  },
+  "notificationsPage": {
+    "title": "Notificaciones",
+    "subtitle": "Actualizaciones sobre proyectos, facturas y coincidencias.",
+    "markAllRead": "Marcar todo como leído",
+    "loading": "Cargando...",
+    "refresh": "Actualizar",
+    "noUnread": "Sin notificaciones sin leer.",
+    "noInView": "No hay notificaciones en esta vista."
+  },
+  "settingsPage": {
+    "subtitle": "Gestiona notificaciones, facturación y cómo funciona Scout para ti.",
+    "backToDashboard": "Panel",
+    "theme": "Tema",
+    "dark": "Oscuro",
+    "light": "Claro",
+    "categories": {
+      "notificationsTitle": "Notificaciones",
+      "notificationsDescription": "Alertas en la app y por correo",
+      "scopeGuardianTitle": "Guardián del alcance",
+      "scopeGuardianDescription": "Con qué rigor marcamos trabajo fuera del alcance",
+      "ratesTitle": "Tarifas y precios",
+      "ratesDescription": "Valores predeterminados para cotizaciones y facturas",
+      "communicationTitle": "Preferencias de comunicación",
+      "communicationDescription": "Cómo prefieres trabajar con los clientes",
+      "accountTitle": "Cuenta",
+      "accountDescription": "Perfil, contraseña y seguridad"
+    }
+  },
+  "featureStub": {
+    "title": "Función",
+    "description": "Maqueta de interfaz con datos de ejemplo.",
+    "profileName": "Freelancer",
+    "profileRole": "Rol del perfil",
+    "previewTitle": "Datos de vista previa",
+    "todo": "TODO: conectar con el backend cuando exista."
+  },
+  "legal": {
+    "helpTitle": "Ayuda y preguntas frecuentes"
+  }
+}

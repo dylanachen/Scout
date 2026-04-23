@@ -15,7 +15,7 @@ function initials(user) {
   return '?';
 }
 
-export default function UserNavMenu({ variant = 'sidebar' }) {
+export default function UserNavMenu({ variant = 'sidebar', dropUp = false }) {
   const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
@@ -102,7 +102,7 @@ export default function UserNavMenu({ variant = 'sidebar' }) {
             left: compact ? 'auto' : 0,
             right: compact ? 0 : 0,
             /* Sidebar sits at bottom of viewport; opening down is clipped by layout overflow:hidden */
-            ...(variant === 'sidebar'
+            ...(variant === 'sidebar' || dropUp
               ? { bottom: 'calc(100% + 6px)', top: 'auto' }
               : { top: 'calc(100% + 6px)' }),
             minWidth: compact ? 180 : undefined,

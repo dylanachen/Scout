@@ -11,7 +11,6 @@ import {
   newId,
   slugEmail,
   upsertInvoice,
-  pushInvoiceToBackend,
 } from '../utils/invoiceStorage';
 import { formatShortDate } from '../utils/dashboard';
 
@@ -296,21 +295,21 @@ export default function InvoiceDraft() {
     [invoiceNumber, projectId, projectName, clientName, clientEmail, freelancerName, freelancerEmail, invoiceDate, dueDate, lineItems, taxPercent, notes],
   );
 
-  const saveDraft = async () => {
-    const rec = buildRecord('draft', {});
-    upsertInvoice(rec);
+  const saveDraft = () => {
+    upsertInvoice(buildRecord('draft', {}));
     setToast('Draft saved.');
     window.setTimeout(() => setToast(''), 2500);
-    await pushInvoiceToBackend(rec);
   };
 
-  const sendToClient = async () => {
+  const sendToClient = () => {
     const sentAt = new Date().toISOString();
-    const rec = buildRecord('sent', { sentAt });
-    upsertInvoice(rec);
+    upsertInvoice(
+      buildRecord('sent', {
+        sentAt,
+      }),
+    );
     setToast('Invoice sent to client.');
     window.setTimeout(() => setToast(''), 2500);
-    await pushInvoiceToBackend(rec);
     navigate('/invoices');
   };
 

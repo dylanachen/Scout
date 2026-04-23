@@ -1,35 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import MetricCard from '../components/MetricCard';
 import { useProjectFromParams } from '../hooks/useProjectFromParams';
 import { formatShortDate } from '../utils/dashboard';
-import { api } from '../api/client';
-import { isDemoMode } from '../api/demoAdapter';
-
-function severityFromBackend(raw) {
-  const s = String(raw || '').toLowerCase();
-  if (s === 'high' || s === 'critical') return 'high';
-  if (s === 'medium' || s === 'med') return 'medium';
-  return 'low';
-}
-
-function outcomeFromStatus(status) {
-  if (status === 'dismissed') return 'dismissed';
-  if (status === 'resolved') return 'change_order_sent';
-  return 'in_progress';
-}
-
-function mapBackendFlag(f) {
-  return {
-    id: String(f.id),
-    date: (f.created_at || '').slice(0, 10),
-    description: f.message,
-    severity: severityFromBackend(f.severity),
-    outcome: outcomeFromStatus(f.status),
-    suggested_reply: f.suggested_reply,
-    contract_clause: f.contract_clause,
-  };
-}
 
 /** @typedef {'low' | 'medium' | 'high'} Severity */
 /** @typedef {'dismissed' | 'change_order_sent' | 'in_progress'} Outcome */
@@ -108,24 +81,8 @@ export default function ScopeDriftReport() {
   const [searchParams] = useSearchParams();
   const sample = searchParams.get('sample') === '1';
 
-  const [flags, setFlags] = useState(() => (sample ? SAMPLE_FLAGS : []));
+  const [flags] = useState(() => (sample ? SAMPLE_FLAGS : []));
   const [dateRange, setDateRange] = useState('month');
-
-  useEffect(() => {
-    if (sample || isDemoMode() || projectId == null) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const { data } = await api.get(`/projects/${projectId}/scope-flags`);
-        if (!cancelled && Array.isArray(data)) {
-          setFlags(data.map(mapBackendFlag));
-        }
-      } catch {
-        if (!cancelled) setFlags([]);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [projectId, sample]);
 
   const today = new Date();
   const hourlyRate = useMemo(() => parseRate(), []);

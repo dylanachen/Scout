@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useProjectFromParams } from '../hooks/useProjectFromParams';
 import { formatShortDate } from '../utils/dashboard';
-import { api } from '../api/client';
-import { isDemoMode } from '../api/demoAdapter';
 
 const RATE_STORAGE = 'scout_default_hourly_rate';
 
@@ -20,35 +18,6 @@ function loadDefaultRate() {
 
 export default function ChangeOrderPreview() {
   const { projectId, projectName, loading } = useProjectFromParams();
-  const navigate = useNavigate();
-  const [sending, setSending] = useState(false);
-  const [sendToast, setSendToast] = useState('');
-
-  const sendToClient = async () => {
-    setSending(true);
-    setSendToast('');
-    const payload = {
-      project_id: Number.isFinite(Number(projectId)) ? Number(projectId) : null,
-      title: `Change Order — ${projectName || 'Untitled Project'}`,
-      description: `${hours} hr @ $${hourlyRate}/hr`,
-      amount_cents: Math.round((Number(additionalCost) || 0) * 100),
-      hours: Number(hours) || 0,
-      status: 'sent',
-    };
-    if (isDemoMode() || payload.project_id == null) {
-      await new Promise((r) => setTimeout(r, 400));
-      setSendToast('Change order sent (demo mode).');
-    } else {
-      try {
-        await api.post(`/projects/${projectId}/change-orders`, payload);
-        setSendToast('Change order sent to client.');
-      } catch (e) {
-        setSendToast(e?.response?.data?.detail || 'Failed to send.');
-      }
-    }
-    setSending(false);
-    window.setTimeout(() => setSendToast(''), 3000);
-  };
   const today = useMemo(() => formatShortDate(new Date()), []);
 
   const [readOnlyDoc, setReadOnlyDoc] = useState(true);
@@ -318,8 +287,6 @@ export default function ChangeOrderPreview() {
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 22, alignItems: 'center' }}>
         <button
           type="button"
-          onClick={sendToClient}
-          disabled={sending}
           style={{
             padding: '12px 20px',
             borderRadius: 10,
@@ -328,16 +295,12 @@ export default function ChangeOrderPreview() {
             fontWeight: 700,
             fontSize: 14,
             border: 'none',
-            cursor: sending ? 'not-allowed' : 'pointer',
-            opacity: sending ? 0.7 : 1,
+            cursor: 'pointer',
             boxShadow: '0 4px 14px rgba(29, 110, 205, 0.35)',
           }}
         >
-          {sending ? 'Sending…' : 'Send to Client'}
+          Send to Client
         </button>
-        {sendToast && (
-          <span style={{ fontSize: 13, color: 'var(--color-text-2)' }}>{sendToast}</span>
-        )}
         <button
           type="button"
           onClick={() => setReadOnlyDoc((v) => !v)}

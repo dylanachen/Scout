@@ -153,6 +153,33 @@ export default function NavSidebar() {
           )}
         </NavLink>
 
+        <NavLink to="/pipeline" style={({ isActive }) => linkStyle(isActive, collapsed)} title="Pipeline">
+          {({ isActive }) => (
+            <>
+              <NavIcon>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path d="M4 5h4v14H4V5zm6 4h4v10h-4V9zm6 3h4v7h-4v-7z" fill={isActive ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                </svg>
+              </NavIcon>
+              <Label collapsed={collapsed}>Pipeline</Label>
+            </>
+          )}
+        </NavLink>
+
+        <NavLink to="/invoices" style={({ isActive }) => linkStyle(isActive, collapsed)} title="Invoices">
+          {({ isActive }) => (
+            <>
+              <NavIcon>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path d="M7 3h8l3 3v14a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1z" fill={isActive ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                  <path d="M9 12h6M9 16h6M9 8h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              </NavIcon>
+              <Label collapsed={collapsed}>Invoices</Label>
+            </>
+          )}
+        </NavLink>
+
         <NavLink to="/chat" style={({ isActive }) => linkStyle(isActive, collapsed)} title="Chat">
           {({ isActive }) => (
             <>
@@ -251,11 +278,16 @@ export default function NavSidebar() {
         </NavLink>
       </nav>
 
-      {!collapsed && (
-        <div style={{ padding: '12px 14px 16px', borderTop: '1px solid var(--color-border)' }}>
-          <UserNavMenu variant="sidebar" />
-        </div>
-      )}
+      <div
+        style={{
+          padding: collapsed ? '10px 6px 14px' : '12px 14px 16px',
+          borderTop: '1px solid var(--color-border)',
+          display: 'flex',
+          justifyContent: collapsed ? 'center' : 'stretch',
+        }}
+      >
+        <UserNavMenu variant={collapsed ? 'compact' : 'sidebar'} dropUp={collapsed} />
+      </div>
     </aside>
   );
 }

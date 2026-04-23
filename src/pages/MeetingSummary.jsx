@@ -1,9 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { getMeetingSummary, setMeetingSummary } from '../utils/meetingStorage';
+import { getMeetingSummary } from '../utils/meetingStorage';
 import { appendExtraDecision } from '../utils/decisionsStorage';
-import { api } from '../api/client';
-import { isDemoMode } from '../api/demoAdapter';
 
 const SEVERITY_STYLES = {
   LOW: { color: 'var(--color-severity-low)', bg: 'var(--color-severity-low-bg)' },
@@ -56,31 +54,7 @@ function CollapsibleHeading({ title, open, onToggle }) {
 export default function MeetingSummary() {
   const { projectId } = useParams();
   const navigate = useNavigate();
-  const [refreshTick, setRefreshTick] = useState(0);
-  const summary = useMemo(() => getMeetingSummary(projectId), [projectId, refreshTick]);
-
-  // Pull latest meeting summary from backend if not cached locally.
-  useEffect(() => {
-    if (isDemoMode() || !projectId || summary) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const { data } = await api.get(`/projects/${projectId}/meetings`);
-        if (cancelled || !Array.isArray(data) || data.length === 0) return;
-        const latest = data[0];
-        const full = await api.get(`/meetings/${latest.id}`);
-        if (cancelled || !full.data) return;
-        const payload = full.data.payload || {};
-        setMeetingSummary(projectId, {
-          ...payload,
-          callStartedAt: full.data.started_at,
-          endedAt: full.data.ended_at,
-        });
-        setRefreshTick((t) => t + 1);
-      } catch { /* no meetings yet */ }
-    })();
-    return () => { cancelled = true; };
-  }, [projectId, summary]);
+  const summary = useMemo(() => getMeetingSummary(projectId), [projectId]);
 
   const [dismissed, setDismissed] = useState(() => new Set());
   const [transcriptOpen, setTranscriptOpen] = useState(false);

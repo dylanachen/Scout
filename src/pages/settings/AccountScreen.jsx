@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { collectAllLocalStorage, downloadJson } from '../../utils/exportCsv';
+import { showToast } from '../../utils/toast';
 
 export default function AccountScreen() {
   const { user, logout, deleteAccount } = useAuth();
@@ -178,6 +180,34 @@ export default function AccountScreen() {
       >
         Change password →
       </Link>
+
+      <button
+        type="button"
+        onClick={() => {
+          const payload = {
+            exportedAt: new Date().toISOString(),
+            user: { name, email, id: user?.id },
+            localStorage: collectAllLocalStorage(),
+          };
+          downloadJson(`scout-my-data-${Date.now()}.json`, payload);
+          showToast('Your data is downloading', 'success');
+        }}
+        style={{
+          width: '100%',
+          padding: '12px',
+          borderRadius: 9,
+          border: '1px solid var(--color-border)',
+          background: 'var(--color-surface)',
+          fontSize: 14,
+          fontWeight: 600,
+          cursor: 'pointer',
+          fontFamily: 'var(--font-sans)',
+          color: 'var(--color-text)',
+          marginBottom: 12,
+        }}
+      >
+        Download my data (JSON)
+      </button>
 
       <button
         type="button"

@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { submitClientRating } from '../utils/clientReputationStorage';
-import { api } from '../api/client';
-import { isDemoMode } from '../api/demoAdapter';
 
 const CATEGORIES = [
   { key: 'assetDelivery', label: 'Asset delivery timeliness', question: 'Did they send what you needed, when you needed it?' },
@@ -101,25 +99,6 @@ export default function RateClientModal({
       paymentSpeed,
       notes,
     });
-
-    // Sync to backend if we know the client's user id. `clientKey` may be either
-    // a numeric user_id or a local slug — only push when it parses as a number.
-    if (!isDemoMode()) {
-      const rateeId = Number(clientKey);
-      if (Number.isFinite(rateeId) && rateeId > 0) {
-        api.post('/ratings', {
-          ratee_id: rateeId,
-          project_id: Number.isFinite(Number(projectId)) ? Number(projectId) : null,
-          overall,
-          asset_delivery: assetDelivery,
-          communication,
-          scope_respect: scopeRespect,
-          payment_speed: paymentSpeed,
-          comment: notes || null,
-        }).catch(() => { /* non-fatal */ });
-      }
-    }
-
     onSubmitted?.();
     onClose?.();
   };

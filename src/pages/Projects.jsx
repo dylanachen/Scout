@@ -1,16 +1,56 @@
 import { Link } from 'react-router-dom';
+import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import ProjectCard from '../components/ProjectCard';
+import EmptyState from '../components/states/EmptyState';
+import ErrorState from '../components/states/ErrorState';
+import Skeleton from '../components/states/Skeleton';
 import { useDashboardData } from '../hooks/useDashboardData';
+import { getBookmarks, saveBookmarks } from '../utils/bookmarksStorage';
 
 export default function Projects() {
+  const { t } = useTranslation();
   const { loading, err, projects } = useDashboardData();
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('deadline');
+  const [visibleCount, setVisibleCount] = useState(8);
+  const [bookmarkedIds, setBookmarkedIds] = useState(() => getBookmarks());
+
+  const filtered = useMemo(() => {
+    let list = [...projects];
+    if (statusFilter !== 'all') {
+      list = list.filter((project) => project.status === statusFilter);
+    }
+    if (sortBy === 'name') {
+      list.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sortBy === 'rate') {
+      list.sort((a, b) => (b.hourly_rate ?? 0) - (a.hourly_rate ?? 0));
+    } else {
+      list.sort((a, b) => String(a.next_deadline ?? '').localeCompare(String(b.next_deadline ?? '')));
+    }
+    return list;
+  }, [projects, statusFilter, sortBy]);
+
+  const visibleProjects = filtered.slice(0, visibleCount);
+  const hasMore = filtered.length > visibleProjects.length;
+
+  const toggleBookmark = (projectId) => {
+    const next = new Set(bookmarkedIds);
+    if (next.has(projectId)) {
+      next.delete(projectId);
+    } else {
+      next.add(projectId);
+    }
+    setBookmarkedIds(next);
+    saveBookmarks(next);
+  };
 
   return (
     <div className="main-scroll" style={{ flex: 1, overflowY: 'auto', padding: '20px 20px 88px' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 6px', letterSpacing: '-0.03em' }}>Projects</h1>
-          <p style={{ fontSize: 13, color: 'var(--color-text-3)', margin: 0 }}>Everything you are working on right now.</p>
+          <h1 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 6px', letterSpacing: '-0.03em' }}>{t('projects.title')}</h1>
+          <p style={{ fontSize: 13, color: 'var(--color-text-3)', margin: 0 }}>{t('projects.subtitle')}</p>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <Link
@@ -26,10 +66,10 @@ export default function Projects() {
               background: 'var(--color-surface)',
             }}
           >
-            Pipeline
+            {t('projects.pipeline')}
           </Link>
           <Link
-            to="/projects/new"
+            to="/onboarding"
             style={{
               padding: '10px 18px',
               borderRadius: 10,
@@ -40,15 +80,31 @@ export default function Projects() {
               textDecoration: 'none',
             }}
           >
-            New project
+            {t('projects.newProject')}
           </Link>
         </div>
       </div>
-
-      {err && (
-        <div style={{ marginBottom: 16, padding: 12, borderRadius: 10, background: '#fef2f2', color: '#991b1b', fontSize: 13 }}>{err}</div>
-      )}
-      {loading && <div style={{ marginBottom: 16, fontSize: 13, color: 'var(--color-text-3)' }}>Loading…</div>}
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
+        <select aria-label={t('projects.filters.statusAria')} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ borderRadius: 8, border: '1px solid var(--color-border)', padding: '8px 10px' }}>
+          <option value="all">{t('projects.filters.allStatuses')}</option>
+          <option value="in_progress">{t('projects.filters.inProgress')}</option>
+          <option value="needs_client">{t('projects.filters.needsClient')}</option>
+          <option value="completed">{t('projects.filters.completed')}</option>
+        </select>
+        <select aria-label={t('projects.filters.sortAria')} value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={{ borderRadius: 8, border: '1px solid var(--color-border)', padding: '8px 10px' }}>
+          <option value="deadline">{t('projects.filters.sortDeadline')}</option>
+          <option value="name">{t('projects.filters.sortName')}</option>
+          <option value="rate">{t('projects.filters.sortRate')}</option>
+        </select>
+      </div>
+      {err ? <ErrorState message={err} /> : null}
+      {loading ? (
+        <div style={{ display: 'grid', gap: 10, marginBottom: 12 }}>
+          <Skeleton height={100} />
+          <Skeleton height={100} />
+          <Skeleton height={100} />
+        </div>
+      ) : null}
 
       <div
         style={{
@@ -57,18 +113,29 @@ export default function Projects() {
           gap: 14,
         }}
       >
-        {projects.map((p) => (
-          <ProjectCard key={p.id} project={p} />
+        {visibleProjects.map((p) => (
+          <ProjectCard key={p.id} project={p} onToggleBookmark={toggleBookmark} isBookmarked={bookmarkedIds.has(p.id)} />
         ))}
       </div>
-      {!projects.length && !loading && (
-        <p style={{ fontSize: 13, color: 'var(--color-text-3)', marginTop: 8 }}>No projects yet. Start one to see it here.</p>
-      )}
+      {!filtered.length && !loading ? (
+        <EmptyState title={t('dashboardPage.noActiveProjects')} message={t('projects.empty')} />
+      ) : null}
+      {hasMore ? (
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 16 }}>
+          <button
+            type="button"
+            onClick={() => setVisibleCount((prev) => prev + 8)}
+            style={{ border: '1px solid var(--color-border)', borderRadius: 10, padding: '10px 14px', background: 'var(--color-surface)', color: 'var(--color-text)', fontWeight: 600, cursor: 'pointer' }}
+          >
+            {t('projects.loadMore')}
+          </button>
+        </div>
+      ) : null}
 
       <Link
         to="/onboarding"
         className="scout-fab"
-        aria-label="Start a New Project"
+        aria-label={t('projects.startProjectAria')}
         style={{
           position: 'fixed',
           bottom: 24,

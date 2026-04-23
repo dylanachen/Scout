@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { STATUS_STYLES, daysUntil, formatDeadlineDate } from '../utils/dashboard';
 
-export default function ProjectCard({ project }) {
+export default function ProjectCard({ project, isBookmarked, onToggleBookmark }) {
   const st = STATUS_STYLES[project.status] ?? STATUS_STYLES.in_progress;
   const counterpart =
     project.viewer_role === 'client'
@@ -144,6 +144,24 @@ export default function ProjectCard({ project }) {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 'auto' }}>
+        {onToggleBookmark ? (
+          <button
+            type="button"
+            onClick={() => onToggleBookmark(project.id)}
+            style={{
+              border: '1px solid var(--color-border)',
+              background: 'var(--color-surface)',
+              color: 'var(--color-text)',
+              borderRadius: 10,
+              padding: '8px 10px',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+            aria-label={isBookmarked ? 'Remove bookmark' : 'Save project'}
+          >
+            {isBookmarked ? 'Bookmarked' : 'Save project'}
+          </button>
+        ) : null}
         <Link
           to="/chat"
           state={{ projectId: project.id }}
@@ -165,18 +183,6 @@ export default function ProjectCard({ project }) {
           }}
         >
           Open Chat
-        </Link>
-        <Link
-          to={`/projects/${project.id}/tasks`}
-          style={{
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            gap: 6, padding: '8px 14px', borderRadius: 10,
-            border: '1px solid var(--color-border)',
-            background: 'var(--color-surface)', color: 'var(--color-text-2)',
-            fontWeight: 600, fontSize: 12, textDecoration: 'none', width: '100%',
-          }}
-        >
-          Tasks & Invoice
         </Link>
       </div>
     </article>

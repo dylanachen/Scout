@@ -1,5 +1,4 @@
 import { isDemoMode } from '../api/demoAdapter';
-import { api } from '../api/client';
 
 const INVOICES_KEY = 'scout_invoices_v1';
 const SEQ_KEY = 'scout_invoice_seq_v1';
@@ -366,62 +365,3 @@ export function computeTotals(lineItems, taxPercent) {
 }
 
 export { newId, slugEmail };
-
-// ── Backend sync helpers ────────────────────────────────────────────────────
-// The backend stores the canonical amount/status/due_date/title; local cache
-// holds rich UI state (line items, tax, timeline). These helpers let the two
-// live side-by-side without blowing the existing UI away.
-
-export async function pushInvoiceToBackend(invoice) {
-  if (isDemoMode() || !invoice) return;
-  const { subtotal, total } = computeTotals(invoice.lineItems || [], invoice.taxPercent);
-  const amountCents = Math.round((total || subtotal || 0) * 100);
-  const payload = {
-    title: invoice.invoiceNumber || invoice.title,
-    description: invoice.notes,
-    amount_cents: amountCents,
-    due_date: invoice.dueDate,
-    client_email: invoice.clientEmail,
-    status: invoice.status || 'draft',
-    project_id: Number.isFinite(Number(invoice.projectId)) ? Number(invoice.projectId) : null,
-    notes: JSON.stringify({
-      invoiceNumber: invoice.invoiceNumber,
-      projectId: invoice.projectId,
-      projectName: invoice.projectName,
-      clientName: invoice.clientName,
-      lineItems: invoice.lineItems,
-      taxPercent: invoice.taxPercent,
-      timeline: invoice.timeline,
-      invoiceDate: invoice.invoiceDate,
-    }),
-  };
-  try {
-    // If we have a backend-style id, try PATCH first
-    if (String(invoice.backendId || '').startsWith('inv_')) {
-      await api.patch(`/invoices/${invoice.backendId}`, {
-        status: payload.status,
-        amount: `$${(amountCents/100).toFixed(2)}`,
-      });
-      return invoice.backendId;
-    }
-    const { data } = await api.post('/invoices', payload);
-    if (data?.id) {
-      invoice.backendId = data.id;
-      setInvoices(getInvoices().map((x) => (x.id === invoice.id ? { ...x, backendId: data.id } : x)));
-    }
-    return data?.id;
-  } catch { /* non-fatal — local copy stays */ }
-}
-
-export async function deleteInvoiceRemote(invoice) {
-  if (isDemoMode() || !invoice?.backendId) return;
-  try { await api.delete(`/invoices/${invoice.backendId}`); } catch { /* noop */ }
-}
-
-export async function fetchBackendInvoices() {
-  if (isDemoMode()) return [];
-  try {
-    const { data } = await api.get('/invoices');
-    return Array.isArray(data) ? data : [];
-  } catch { return []; }
-}

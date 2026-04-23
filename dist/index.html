@@ -2,12 +2,24 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>FreelanceOS</title>
-    <script type="module" crossorigin src="/assets/index-DSGO_ORF.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-D1_rS_GD.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#1d6ecd" />
+    <meta name="description" content="Smart matching, contracts, invoices, and project ops for freelancers and clients." />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="/icons/icon.svg" />
+    <link rel="apple-touch-icon" href="/icons/icon.svg" />
+    <title>Scout</title>
+    <script type="module" crossorigin src="/assets/index-g1PtSFKX.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-DkLlLKDr.css">
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('/sw.js').catch(function () {});
+        });
+      }
+    </script>
   </body>
 </html>

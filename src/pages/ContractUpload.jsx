@@ -1,8 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useProjectFromParams } from '../hooks/useProjectFromParams';
-import { api } from '../api/client';
-import { isDemoMode } from '../api/demoAdapter';
 
 function formatFileSize(bytes) {
   if (bytes < 1024) return `${bytes} B`;
@@ -34,35 +32,14 @@ export default function ContractUpload() {
     if (inputRef.current) inputRef.current.value = '';
   }, []);
 
-  const runPipeline = useCallback(async () => {
-    if (!file) return;
+  const runPipeline = useCallback(() => {
     setProcessing(true);
     setContractActive(false);
-    setFileError('');
-
-    if (isDemoMode() || projectId == null) {
-      // Demo: no backend — simulate the processing delay
-      await new Promise((r) => window.setTimeout(r, 2000));
+    window.setTimeout(() => {
       setProcessing(false);
       setContractActive(true);
-      return;
-    }
-
-    try {
-      const form = new FormData();
-      form.append('file', file);
-      await api.post(`/projects/${projectId}/contract`, form, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      // Backend RAG ingestion runs in background; give it a beat then flip the UI.
-      await new Promise((r) => window.setTimeout(r, 1200));
-      setProcessing(false);
-      setContractActive(true);
-    } catch (err) {
-      setProcessing(false);
-      setFileError(err?.response?.data?.detail || 'Upload failed. Please try again.');
-    }
-  }, [file, projectId]);
+    }, 3500);
+  }, []);
 
   const onFile = useCallback((f) => {
     setFileError('');

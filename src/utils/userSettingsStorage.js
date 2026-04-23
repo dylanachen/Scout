@@ -1,8 +1,5 @@
 /** Client-side prefs (notifications, scope, rates, communication) — keyed by user id. */
 
-import { isDemoMode } from '../api/demoAdapter';
-import { api } from '../api/client';
-
 const KEY = (id) => `scout_user_settings_${id}`;
 
 const defaultNotificationTypes = () => ({
@@ -67,22 +64,6 @@ export function setUserSettings(userId, patch) {
   } catch {
     /* ignore */
   }
-  // Best-effort push to backend so settings survive device changes.
-  if (!isDemoMode()) {
-    api.patch('/settings', { settings: patch }).catch(() => { /* non-fatal */ });
-  }
-}
-
-/** Pull backend settings into local cache (call on app mount once user is known). */
-export async function syncSettingsFromBackend(userId) {
-  if (userId == null || isDemoMode()) return;
-  try {
-    const { data } = await api.get('/settings');
-    if (data && typeof data === 'object') {
-      const prev = getUserSettings(userId);
-      localStorage.setItem(KEY(userId), JSON.stringify(deepMerge(prev, data)));
-    }
-  } catch { /* noop */ }
 }
 
 export function patchNotificationType(userId, typeId, patch) {

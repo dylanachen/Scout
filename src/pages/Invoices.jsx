@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { computeTotals, getInvoices, upsertInvoice, pushInvoiceToBackend, fetchBackendInvoices } from '../utils/invoiceStorage';
+import { computeTotals, getInvoices, upsertInvoice } from '../utils/invoiceStorage';
 import { formatShortDate } from '../utils/dashboard';
+import { downloadCsv } from '../utils/exportCsv';
+import { showToast } from '../utils/toast';
 
 const FILTERS = ['all', 'draft', 'sent', 'paid', 'overdue'];
 
@@ -285,6 +287,17 @@ function InvoiceDetailModal({ inv, onClose, onMarkPaid, onReminder }) {
   );
 }
 
+const toolbarBtn = {
+  padding: '8px 12px',
+  borderRadius: 8,
+  border: '1px solid var(--color-border)',
+  background: 'var(--color-surface)',
+  fontSize: 13,
+  fontWeight: 600,
+  cursor: 'pointer',
+  fontFamily: 'var(--font-sans)',
+};
+
 export default function Invoices() {
   const [tick, setTick] = useState(0);
   const [filter, setFilter] = useState('all');
@@ -298,44 +311,6 @@ export default function Invoices() {
 
   const refresh = useCallback(() => setTick((t) => t + 1), []);
 
-  // Pull from backend on mount; if we have backend invoices not in local, seed them.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const remote = await fetchBackendInvoices();
-      if (cancelled || !Array.isArray(remote) || remote.length === 0) return;
-      const local = getInvoices();
-      const haveBackend = new Set(local.map((x) => x.backendId).filter(Boolean));
-      const toAdd = remote.filter((r) => !haveBackend.has(r.id));
-      for (const r of toAdd) {
-        upsertInvoice({
-          id: `srv_${r.id}`,
-          backendId: r.id,
-          invoiceNumber: r.title || r.id,
-          projectId: r.project_id,
-          projectName: r.project_name,
-          clientName: r.client_name,
-          clientEmail: r.client_email,
-          invoiceDate: (r.created_at || '').slice(0, 10),
-          dueDate: r.due_date,
-          status: r.status,
-          notes: r.description,
-          lineItems: [{
-            id: `li_${r.id}`,
-            description: r.description || r.title || 'Invoice',
-            kind: 'service', hoursOrQty: 1,
-            rate: (r.amount_cents || 0) / 100,
-            total: (r.amount_cents || 0) / 100,
-          }],
-          taxPercent: null,
-          timeline: { sentAt: null, viewedAt: null, paidAt: r.paid_at },
-        });
-      }
-      if (toAdd.length) setTick((t) => t + 1);
-    })();
-    return () => { cancelled = true; };
-  }, []);
-
   const filtered = useMemo(() => {
     if (filter === 'all') return rows;
     return rows.filter((inv) => getDisplayStatus(inv) === filter);
@@ -343,16 +318,15 @@ export default function Invoices() {
 
   const selected = useMemo(() => rows.find((r) => r.id === selectedId) ?? null, [rows, selectedId]);
 
-  const markPaid = async (inv) => {
-    const updated = {
+  const markPaid = (inv) => {
+    upsertInvoice({
       ...inv,
       status: 'paid',
-      timeline: { ...inv.timeline, paidAt: new Date().toISOString() },
-    };
-    upsertInvoice(updated);
-    refresh();
-    // Also push to backend (best-effort)
-    await pushInvoiceToBackend(updated);
+      timeline: {
+        ...inv.timeline,
+        paidAt: new Date().toISOString(),
+      },
+    });
     refresh();
   };
 
@@ -363,9 +337,41 @@ export default function Invoices() {
 
   return (
     <div className="main-scroll" style={{ flex: 1, overflowY: 'auto', padding: '20px 20px 88px' }}>
-      <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 6px', letterSpacing: '-0.03em' }}>Invoices</h1>
-        <p style={{ fontSize: 13, color: 'var(--color-text-3)', margin: 0 }}>All invoices across your projects.</p>
+      <div style={{ marginBottom: 20, display: 'flex', gap: 10, justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <div>
+          <h1 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 6px', letterSpacing: '-0.03em' }}>Invoices</h1>
+          <p style={{ fontSize: 13, color: 'var(--color-text-3)', margin: 0 }}>All invoices across your projects.</p>
+        </div>
+        <div className="scout-no-print" style={{ display: 'flex', gap: 8 }}>
+          <button
+            type="button"
+            onClick={() => {
+              const exportRows = rows.map((inv) => {
+                const { total } = computeTotals(inv.lineItems ?? [], inv.taxPercent);
+                return {
+                  invoice: inv.invoiceNumber,
+                  client: inv.clientName,
+                  project: inv.projectName,
+                  status: getDisplayStatus(inv),
+                  due: inv.dueDate,
+                  total,
+                };
+              });
+              downloadCsv(`scout-invoices-${Date.now()}.csv`, exportRows);
+              showToast('Invoices CSV downloaded', 'success');
+            }}
+            style={toolbarBtn}
+          >
+            Export CSV
+          </button>
+          <button
+            type="button"
+            onClick={() => window.print()}
+            style={toolbarBtn}
+          >
+            Print
+          </button>
+        </div>
       </div>
 
       {toast ? (
