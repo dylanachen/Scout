@@ -126,15 +126,6 @@ The seeded chat transcripts include a scope-creep moment (Summit Analytics asks 
 
 ---
 
-## Main routes
-
-**Auth** &nbsp;`/login` · `/signup` · `/forgot-password`
-
-**Core** &nbsp;`/` · `/projects` · `/projects/new` · `/pipeline` · `/matches` · `/interests` · `/invitations` · `/notifications` · `/chat` · `/invoices` · `/settings`
-
-**Project tools** &nbsp;`/projects/:projectId/tasks` · `…/contract` · `…/change-order` · `…/invoice-draft` · `…/scope-drift` · `…/meeting-summary` · `…/rate-client` · `…/milestones`
-
----
 
 ## Development notes
 
