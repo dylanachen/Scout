@@ -27,6 +27,7 @@ VITE_DEMO_MODE=false
 OPENAI_API_KEY = Enter you api key
 ```
 
+Running commands
 ```bash
 cd backend   # this README’s directory
 npm install
@@ -36,7 +37,7 @@ npm run dev            # http://localhost:3000
 
 **Demo mode (no API):** set `VITE_DEMO_MODE=true`, restart Vite, then use mock login / **Explore signed-in UI**.
 
-
+<br><br>
 # Web/Mobile Backend Reproducing
 
 ```bash
