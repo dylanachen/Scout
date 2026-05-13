@@ -1,0 +1,117 @@
+{
+  "common": {
+    "loading": "加载中…",
+    "dashboard": "仪表板",
+    "settings": "设置",
+    "save": "保存",
+    "cancel": "取消",
+    "retry": "重试"
+  },
+  "projects": {
+    "title": "项目",
+    "subtitle": "你当前正在进行的全部事项。",
+    "newProject": "新建项目",
+    "empty": "暂无项目。创建一个开始使用。",
+    "pipeline": "流水线",
+    "filters": {
+      "statusAria": "按状态过滤项目",
+      "sortAria": "项目排序",
+      "allStatuses": "所有状态",
+      "inProgress": "进行中",
+      "needsClient": "需客户跟进",
+      "completed": "已完成",
+      "sortDeadline": "排序:截止日期",
+      "sortName": "排序:名称",
+      "sortRate": "排序:费率"
+    },
+    "loadMore": "加载更多",
+    "startProjectAria": "创建新项目"
+  },
+  "matches": {
+    "title": "匹配结果",
+    "none": "暂无匹配",
+    "sortBy": "排序",
+    "minRating": "最低评分",
+    "skill": "技能",
+    "loadMore": "加载更多匹配",
+    "goToDashboard": "前往仪表板",
+    "countFound_one": "找到 {{count}} 个匹配",
+    "countFound_other": "找到 {{count}} 个匹配",
+    "sorts": {
+      "bestMatch": "最佳匹配",
+      "skillFit": "技能契合",
+      "timeline": "时间线",
+      "budget": "预算"
+    },
+    "any": "任意",
+    "buildingTitle": "仍在为你生成匹配 — 稍后回来查看",
+    "buildingBody": "当我们找到符合你技能与偏好的人时,他们会出现在这里。",
+    "skillPlaceholder": "例如 设计"
+  },
+  "dashboardPage": {
+    "pipelineView": "流水线视图",
+    "startProject": "创建新项目",
+    "activeProjects": "活跃项目",
+    "viewAll": "查看全部",
+    "pendingMatches": "待处理匹配",
+    "recentActivity": "最近活动",
+    "viewAllNotifications": "查看全部通知",
+    "loading": "正在加载仪表板…",
+    "noActiveProjects": "暂无活跃项目",
+    "noNotifications": "暂无通知。",
+    "refresh": "刷新",
+    "metrics": {
+      "activeProjects": "活跃项目",
+      "hoursThisWeek": "本周工时",
+      "pendingInvoices": "待处理发票",
+      "unreadMessages": "未读消息",
+      "projectsUnit": "个项目",
+      "hoursUnit": "小时",
+      "totalSuffix": "共 {{total}}"
+    },
+    "matchesActions": {
+      "accept": "接受",
+      "pass": "跳过"
+    },
+    "fabAria": "创建新项目"
+  },
+  "notificationsPage": {
+    "title": "通知",
+    "subtitle": "涵盖项目、发票和匹配的更新。",
+    "markAllRead": "全部标为已读",
+    "loading": "加载中…",
+    "refresh": "刷新",
+    "noUnread": "没有未读通知。",
+    "noInView": "此视图中暂无通知。"
+  },
+  "settingsPage": {
+    "subtitle": "管理通知、计费和 Scout 的工作方式。",
+    "backToDashboard": "仪表板",
+    "theme": "主题",
+    "dark": "深色",
+    "light": "浅色",
+    "categories": {
+      "notificationsTitle": "通知",
+      "notificationsDescription": "应用内和邮件提醒",
+      "scopeGuardianTitle": "范围守护",
+      "scopeGuardianDescription": "对范围外工作的提示严格程度",
+      "ratesTitle": "费率与价格",
+      "ratesDescription": "报价和发票的默认值",
+      "communicationTitle": "沟通偏好",
+      "communicationDescription": "你与客户协作的方式",
+      "accountTitle": "账户",
+      "accountDescription": "资料、密码和安全"
+    }
+  },
+  "featureStub": {
+    "title": "功能",
+    "description": "用模拟数据搭建的界面。",
+    "profileName": "自由职业者",
+    "profileRole": "资料角色",
+    "previewTitle": "模拟预览数据",
+    "todo": "待办:等后端就绪后接入接口。"
+  },
+  "legal": {
+    "helpTitle": "帮助和常见问题"
+  }
+}

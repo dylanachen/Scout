@@ -1,0 +1,137 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "dashboard": "Dashboard",
+    "settings": "Settings",
+    "save": "Save",
+    "cancel": "Cancel",
+    "retry": "Retry"
+  },
+  "projects": {
+    "title": "Projects",
+    "subtitle": "Everything you are working on right now.",
+    "newProject": "New project",
+    "empty": "No projects yet. Start one to see it here.",
+    "pipeline": "Pipeline",
+    "filters": {
+      "statusAria": "Filter projects by status",
+      "sortAria": "Sort projects",
+      "allStatuses": "All statuses",
+      "inProgress": "In progress",
+      "needsClient": "Needs client",
+      "completed": "Completed",
+      "sortDeadline": "Sort: Deadline",
+      "sortName": "Sort: Name",
+      "sortRate": "Sort: Rate"
+    },
+    "loadMore": "Load more",
+    "startProjectAria": "Start a New Project"
+  },
+  "matches": {
+    "title": "Your matches",
+    "none": "No matches yet",
+    "sortBy": "Sort by",
+    "minRating": "Min rating",
+    "skill": "Skill",
+    "loadMore": "Load more matches",
+    "goToDashboard": "Go to Dashboard",
+    "countFound_one": "{{count}} match found",
+    "countFound_other": "{{count}} matches found",
+    "sorts": {
+      "bestMatch": "Best Match",
+      "skillFit": "Skill Fit",
+      "timeline": "Timeline",
+      "budget": "Budget"
+    },
+    "any": "Any",
+    "buildingTitle": "We're still building your matches — check back soon",
+    "buildingBody": "When we find people who fit your skills and preferences, they'll show up here.",
+    "skillPlaceholder": "e.g. design"
+  },
+  "dashboardPage": {
+    "pipelineView": "Pipeline view",
+    "startProject": "Start a New Project",
+    "activeProjects": "Active projects",
+    "viewAll": "View all",
+    "pendingMatches": "Pending matches",
+    "recentActivity": "Recent Activity",
+    "viewAllNotifications": "View all notifications",
+    "loading": "Loading dashboard...",
+    "noActiveProjects": "No active projects",
+    "noNotifications": "No notifications.",
+    "refresh": "Refresh",
+    "metrics": {
+      "activeProjects": "Active projects",
+      "hoursThisWeek": "Hours this week",
+      "pendingInvoices": "Pending invoices",
+      "unreadMessages": "Unread messages",
+      "projectsUnit": "projects",
+      "hoursUnit": "hrs",
+      "totalSuffix": "{{total}} total"
+    },
+    "matchesActions": {
+      "accept": "Accept",
+      "pass": "Pass"
+    },
+    "fabAria": "Start a New Project"
+  },
+  "notificationsPage": {
+    "title": "Notifications",
+    "subtitle": "Updates across projects, invoices, and matches.",
+    "markAllRead": "Mark all as read",
+    "loading": "Loading...",
+    "refresh": "Refresh",
+    "noUnread": "No unread notifications.",
+    "noInView": "No notifications in this view."
+  },
+  "settingsPage": {
+    "subtitle": "Manage notifications, billing defaults, and how Scout works for you.",
+    "backToDashboard": "Dashboard",
+    "theme": "Theme",
+    "dark": "Dark",
+    "light": "Light",
+    "categories": {
+      "notificationsTitle": "Notifications",
+      "notificationsDescription": "In-app and email alerts",
+      "scopeGuardianTitle": "Scope Guardian",
+      "scopeGuardianDescription": "How strictly we flag out-of-scope work",
+      "ratesTitle": "Rates & Pricing",
+      "ratesDescription": "Defaults for quotes and invoices",
+      "communicationTitle": "Communication Preferences",
+      "communicationDescription": "How you like to work with clients",
+      "accountTitle": "Account",
+      "accountDescription": "Profile, password, and security"
+    },
+    "stubs": {
+      "publicProfile": "Public Profile (stub)",
+      "proposalForm": "Proposal Form (stub)",
+      "contractScreen": "Contract Screen (stub)",
+      "milestones": "Milestones (stub)",
+      "globalSearch": "Global Search (stub)",
+      "inbox": "Unified Inbox (stub)",
+      "publicProfileTitle": "Public Profile",
+      "publicProfileDesc": "Avatar, bio, skills, reviews, and portfolio mock layout.",
+      "proposalTitle": "Proposal Form",
+      "proposalDesc": "Send proposal/bid UI wired to placeholder submit.",
+      "contractTitle": "Contract Screen",
+      "contractDesc": "Scope, terms, and accept interaction placeholder.",
+      "milestonesTitle": "Milestones",
+      "milestonesDesc": "Milestone list with Fund/Release disabled actions.",
+      "searchTitle": "Global Search",
+      "searchDesc": "Tabbed search across projects/freelancers/skills.",
+      "inboxTitle": "Unified Inbox",
+      "inboxDesc": "Conversation list that reuses chat detail view."
+    }
+  },
+  "featureStub": {
+    "title": "Feature",
+    "description": "UI scaffold with mock data.",
+    "profileName": "Freelancer",
+    "profileRole": "Profile role",
+    "previewTitle": "Mock preview data",
+    "todo": "TODO: hook up endpoint and mutation flow when backend lands."
+  },
+  "legal": {
+    "helpTitle": "Help & FAQ"
+  }
+}
