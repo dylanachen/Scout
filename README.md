@@ -29,8 +29,7 @@ OPENAI_API_KEY = Enter you api key
 
 Running commands
 ```bash
-cd backend   # this README’s directory
-npm install
+npm install            # this README’s directory
 cp .env.example .env   # set VITE_API_URL and VITE_WS_URL
 npm run dev            # http://localhost:3000
 ```
