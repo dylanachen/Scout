@@ -1,0 +1,1 @@
+import{o as s,a as c,r as n}from"./index-Dv-niEWP.js";function p(){const{projectId:r}=s(),{projects:o,loading:a}=c(),t=n.useMemo(()=>o.find(e=>e.id===String(r)),[o,r]);return{projectId:r!=null?String(r):"",project:t,loading:a,projectName:t?.name??"Project"}}export{p as u};

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#1d6ecd" />
+    <meta name="description" content="Smart matching, contracts, invoices, and project ops for freelancers and clients." />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="/icons/icon.svg" />
+    <link rel="apple-touch-icon" href="/icons/icon.svg" />
+    <title>Scout</title>
+    <script type="module" crossorigin src="/assets/index-Dv-niEWP.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-f92oJ2Zh.css">
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      (function () {
+        var isDev = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+        if (!('serviceWorker' in navigator)) return;
+
+        if (isDev) {
+          var RELOAD_FLAG = '__scout_sw_purged__';
+          navigator.serviceWorker.getRegistrations().then(function (regs) {
+            if (!regs.length) return;
+            var clearCaches = (window.caches && caches.keys)
+              ? caches.keys().then(function (keys) {
+                  return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+                })
+              : Promise.resolve();
+            return Promise.all(regs.map(function (r) { return r.unregister(); }))
+              .then(function () { return clearCaches; })
+              .then(function () {
+                if (!sessionStorage.getItem(RELOAD_FLAG)) {
+                  sessionStorage.setItem(RELOAD_FLAG, '1');
+                  location.reload();
+                }
+              });
+          }).catch(function () {});
+          return;
+        }
+
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('/sw.js').catch(function () {});
+        });
+      })();
+    </script>
+  </body>
+</html>

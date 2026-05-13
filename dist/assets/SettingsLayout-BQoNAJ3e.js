@@ -1,0 +1,1 @@
+import{j as t,O as e}from"./index-Dv-niEWP.js";function i(){return t.jsx("div",{style:{flex:1,minHeight:0,overflowY:"auto",WebkitOverflowScrolling:"touch"},children:t.jsx(e,{})})}export{i as default};
